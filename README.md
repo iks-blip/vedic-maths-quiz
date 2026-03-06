@@ -39,6 +39,38 @@ export EVENT_START_AT_IST="2026-03-14T00:00:00+05:30"
 export EVENT_END_AT_IST="2026-03-14T12:00:00+05:30"
 ```
 
+## Admin Panel
+- URL: `/admin`
+- Set token before starting server:
+```bash
+export ADMIN_TOKEN="replace-with-strong-token"
+```
+- Admin APIs require `Authorization: Bearer <token>`.
+- Includes leaderboard view, submissions view, audit logs, disqualify action, and CSV export.
+
+## Anti-Cheat Controls
+- IP-based request throttling on `/api/attempts/*` and `/api/admin/*`.
+- Suspicious flags in admin submissions (tab switches, very-fast answers, disqualified).
+- Admin disqualify endpoint:
+```bash
+POST /api/admin/attempts/:attemptId/disqualify
+Authorization: Bearer <ADMIN_TOKEN>
+```
+
+## Event Controls
+- Admin can set event state from `/admin`:
+  - `active`: quiz operations enabled
+  - `paused`: blocks new attempts and in-progress actions
+  - `stopped`: blocks new attempts and in-progress actions
+- APIs:
+```bash
+GET /api/event-state
+GET /api/admin/event-state
+POST /api/admin/event-state
+Authorization: Bearer <ADMIN_TOKEN>
+Body: { "status": "active|paused|stopped", "actor": "admin_name" }
+```
+
 ## Test
 ```bash
 npm test

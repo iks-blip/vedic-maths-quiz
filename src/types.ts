@@ -52,6 +52,28 @@ export interface Attempt {
   answers: AttemptQuestion[];
   submittedAt?: number;
   voidReason?: string;
+  submissionAuditLogged?: boolean;
+  isDisqualified?: boolean;
+  disqualifiedAt?: number;
+  disqualifiedBy?: string;
+}
+
+export type AuditEventType =
+  | "attempt_started"
+  | "attempt_submitted"
+  | "attempt_voided"
+  | "tab_switch_warning"
+  | "attempt_disqualified"
+  | "event_state_changed";
+
+export interface AuditEvent {
+  id: string;
+  type: AuditEventType;
+  attemptId: string;
+  email: string;
+  name: string;
+  at: string;
+  metadata?: Record<string, string | number | boolean | null>;
 }
 
 export interface StartAttemptResponse {

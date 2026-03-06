@@ -8,7 +8,10 @@ import {
   TARGET_DISTRIBUTION
 } from "./config.js";
 import type { AttemptStore } from "./store.js";
+import type { AuditStore } from "./audit-store.js";
+import type { EventControlState, EventControlStatus, EventControlStore } from "./event-control-store.js";
 import {
+  AuditEvent,
   AnswerResponse,
   Attempt,
   AttemptSummary,
@@ -44,6 +47,8 @@ export class QuizEngine {
   constructor(
     private readonly questionBank: Question[],
     private readonly store: AttemptStore,
+    private readonly auditStore: AuditStore,
+    private readonly eventControlStore: EventControlStore,
     options: QuizEngineOptions = {}
   ) {
     this.now = options.now ?? (() => Date.now());
@@ -60,6 +65,7 @@ export class QuizEngine {
 
   async startAttempt(name: string, email: string): Promise<StartAttemptResponse> {
     this.assertWithinEventWindowForStart(this.now());
+    await this.assertCanStartByAdminControl();
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!name.trim()) {
@@ -91,6 +97,10 @@ export class QuizEngine {
     };
 
     await this.store.saveAttempt(attempt);
+    await this.logAudit({
+      type: "attempt_started",
+      attempt
+    });
 
     return {
       attemptId,
@@ -102,12 +112,14 @@ export class QuizEngine {
   }
 
   async answerAttempt(attemptId: string, selectedAnswer: string): Promise<AnswerResponse> {
+    await this.assertCanProgressByAdminControl();
     const attempt = await this.requireInProgressAttempt(attemptId);
     const now = this.now();
 
     this.autoSubmitIfEventEnded(attempt, now);
     this.autoSubmitIfDisconnected(attempt, now);
     this.applyTimerWindow(attempt, now);
+    await this.logSubmissionAuditIfNeeded(attempt);
 
     if (attempt.status !== "in_progress") {
       await this.store.saveAttempt(attempt);
@@ -134,12 +146,14 @@ export class QuizEngine {
 
     if (attempt.currentIndex >= attempt.questions.length) {
       this.submitAttempt(attempt, now, "completed");
+      await this.logSubmissionAuditIfNeeded(attempt);
       await this.store.saveAttempt(attempt);
       return this.asSubmittedResponse(attempt, "completed");
     }
 
     if (attempt.graceConsumed && attempt.graceQuestionIndex !== undefined && attempt.currentIndex > attempt.graceQuestionIndex) {
       this.submitAttempt(attempt, now, "timer_expired");
+      await this.logSubmissionAuditIfNeeded(attempt);
       await this.store.saveAttempt(attempt);
       return this.asSubmittedResponse(attempt, "timer_expired");
     }
@@ -159,12 +173,14 @@ export class QuizEngine {
   }
 
   async getCurrentQuestion(attemptId: string): Promise<AnswerResponse> {
+    await this.assertCanProgressByAdminControl();
     const attempt = await this.requireInProgressAttempt(attemptId);
     const now = this.now();
 
     this.autoSubmitIfEventEnded(attempt, now);
     this.autoSubmitIfDisconnected(attempt, now);
     this.applyTimerWindow(attempt, now);
+    await this.logSubmissionAuditIfNeeded(attempt);
 
     if (attempt.status !== "in_progress") {
       await this.store.saveAttempt(attempt);
@@ -186,18 +202,21 @@ export class QuizEngine {
   }
 
   async recordHeartbeat(attemptId: string): Promise<void> {
+    await this.assertCanProgressByAdminControl();
     const attempt = await this.requireInProgressAttempt(attemptId);
     attempt.lastSeenAt = this.now();
     await this.store.saveAttempt(attempt);
   }
 
   async recordTabSwitch(attemptId: string): Promise<AnswerResponse> {
+    await this.assertCanProgressByAdminControl();
     const attempt = await this.requireInProgressAttempt(attemptId);
     const now = this.now();
 
     this.autoSubmitIfEventEnded(attempt, now);
     this.autoSubmitIfDisconnected(attempt, now);
     this.applyTimerWindow(attempt, now);
+    await this.logSubmissionAuditIfNeeded(attempt);
 
     if (attempt.status !== "in_progress") {
       await this.store.saveAttempt(attempt);
@@ -209,10 +228,18 @@ export class QuizEngine {
 
     if (attempt.tabSwitchCount >= 2) {
       this.submitAttempt(attempt, now, "tab_switch_limit");
+      await this.logSubmissionAuditIfNeeded(attempt);
       await this.store.saveAttempt(attempt);
       return this.asSubmittedResponse(attempt, "tab_switch_limit");
     }
 
+    await this.logAudit({
+      type: "tab_switch_warning",
+      attempt,
+      metadata: {
+        tabSwitchCount: attempt.tabSwitchCount
+      }
+    });
     await this.store.saveAttempt(attempt);
     return {
       status: "in_progress",
@@ -230,13 +257,25 @@ export class QuizEngine {
     const attempt = await this.requireInProgressAttempt(attemptId);
     attempt.status = "void";
     attempt.voidReason = reason;
+    await this.logAudit({
+      type: "attempt_voided",
+      attempt,
+      metadata: {
+        reason
+      }
+    });
     await this.store.deleteAttempt(attempt.id);
   }
 
   async getLeaderboard(limit = 20): Promise<AttemptSummary[]> {
     const attempts = await this.store.listAttempts();
     return attempts
-      .filter((attempt) => attempt.status === "submitted" && attempt.submittedAt !== undefined)
+      .filter(
+        (attempt) =>
+          attempt.status === "submitted" &&
+          attempt.submittedAt !== undefined &&
+          !attempt.isDisqualified
+      )
       .sort((a, b) => {
         if (b.score !== a.score) {
           return b.score - a.score;
@@ -256,6 +295,68 @@ export class QuizEngine {
   async getSubmittedAttempts(): Promise<Attempt[]> {
     const attempts = await this.store.listAttempts();
     return attempts.filter((attempt) => attempt.status === "submitted");
+  }
+
+  async disqualifyAttempt(attemptId: string, actor = "admin"): Promise<Attempt> {
+    const attempt = await this.store.getAttempt(attemptId);
+    if (!attempt) {
+      throw new QuizRuleError("Attempt not found", 404);
+    }
+    if (attempt.isDisqualified) {
+      return attempt;
+    }
+
+    const now = this.now();
+    attempt.isDisqualified = true;
+    attempt.disqualifiedAt = now;
+    attempt.disqualifiedBy = actor;
+    attempt.voidReason = "disqualified_by_admin";
+    attempt.submissionAuditLogged = true;
+
+    if (attempt.status === "in_progress") {
+      attempt.status = "submitted";
+      attempt.submittedAt = now;
+      attempt.score = 0;
+    }
+
+    await this.logAudit({
+      type: "attempt_disqualified",
+      attempt,
+      metadata: {
+        actor
+      }
+    });
+    await this.store.saveAttempt(attempt);
+    return attempt;
+  }
+
+  async getAuditLogs(limit = 100): Promise<AuditEvent[]> {
+    return this.auditStore.list(limit);
+  }
+
+  async getEventControlState(): Promise<EventControlState> {
+    return this.eventControlStore.getState();
+  }
+
+  async setEventControlState(status: EventControlStatus, actor = "admin"): Promise<EventControlState> {
+    const next: EventControlState = {
+      status,
+      updatedAt: new Date(this.now()).toISOString(),
+      updatedBy: actor
+    };
+    await this.eventControlStore.setState(next);
+    await this.auditStore.append({
+      id: uuidv4(),
+      type: "event_state_changed",
+      attemptId: "event",
+      email: "",
+      name: actor,
+      at: next.updatedAt,
+      metadata: {
+        status
+      }
+    });
+    return next;
   }
 
   async getAttemptForTesting(attemptId: string): Promise<Attempt | undefined> {
@@ -375,6 +476,26 @@ export class QuizEngine {
     }
   }
 
+  private async assertCanStartByAdminControl(): Promise<void> {
+    const state = await this.eventControlStore.getState();
+    if (state.status === "paused") {
+      throw new QuizRuleError("Event is paused by admin", 423);
+    }
+    if (state.status === "stopped") {
+      throw new QuizRuleError("Event has been stopped by admin", 403);
+    }
+  }
+
+  private async assertCanProgressByAdminControl(): Promise<void> {
+    const state = await this.eventControlStore.getState();
+    if (state.status === "paused") {
+      throw new QuizRuleError("Event is paused by admin", 423);
+    }
+    if (state.status === "stopped") {
+      throw new QuizRuleError("Event has been stopped by admin", 403);
+    }
+  }
+
   private async requireInProgressAttempt(attemptId: string): Promise<Attempt> {
     const attempt = await this.store.getAttempt(attemptId);
     if (!attempt) {
@@ -397,5 +518,37 @@ export class QuizEngine {
       submittedAt: new Date(attempt.submittedAt ?? this.now()).toISOString(),
       reason: attempt.voidReason ?? reason
     };
+  }
+
+  private async logAudit(params: {
+    type: AuditEvent["type"];
+    attempt: Attempt;
+    metadata?: Record<string, string | number | boolean | null>;
+  }): Promise<void> {
+    await this.auditStore.append({
+      id: uuidv4(),
+      type: params.type,
+      attemptId: params.attempt.id,
+      email: params.attempt.email,
+      name: params.attempt.name,
+      at: new Date(this.now()).toISOString(),
+      metadata: params.metadata
+    });
+  }
+
+  private async logSubmissionAuditIfNeeded(attempt: Attempt): Promise<void> {
+    if (attempt.status !== "submitted" || attempt.submissionAuditLogged) {
+      return;
+    }
+
+    await this.logAudit({
+      type: "attempt_submitted",
+      attempt,
+      metadata: {
+        reason: attempt.voidReason ?? "unknown",
+        score: attempt.score
+      }
+    });
+    attempt.submissionAuditLogged = true;
   }
 }
