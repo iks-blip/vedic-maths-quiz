@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vedic Maths Challenge</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-pattern"></div>
+    <main class="container">
+      <header class="hero">
+        <div class="logo-mark">∑</div>
+        <h1>Vedic Maths <span class="accent">Challenge</span></h1>
+        <p class="subtitle">25 questions • 20 minutes • High Stakes</p>
+      </header>
+
+      <section id="start-card" class="card glass">
+        <div class="card-header">
+          <h2>Begin Your Journey</h2>
+          <p>Enter your details to start the competitive attempt.</p>
+        </div>
+        <form id="start-form">
+          <div class="input-group">
+            <label for="name">Full Name</label>
+            <input id="name" placeholder="Aryabhatta" required />
+          </div>
+          <div class="input-group">
+            <label for="email">Email Address</label>
+            <input id="email" type="email" placeholder="scholar@gurukul.edu" required />
+          </div>
+          <button type="submit" class="btn-primary">
+            <span>Start Quiz</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </form>
+        <p id="start-error" class="error"></p>
+      </section>
+
+      <section id="quiz-card" class="card glass hidden">
+        <div class="quiz-header">
+          <div class="stat">
+            <span class="label">Progress</span>
+            <span id="progress" class="value">01/25</span>
+          </div>
+          <div class="stat">
+            <span class="label">Current Score</span>
+            <span id="score" class="value highlight">0</span>
+          </div>
+          <div class="stat timer-stat">
+            <span class="label">Time Remaining</span>
+            <span id="timer" class="value">20:00</span>
+          </div>
+        </div>
+        
+        <div class="progress-bar-container">
+          <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+        </div>
+
+        <div class="question-container">
+          <h2 id="question-text"></h2>
+          <div id="options" class="options-grid"></div>
+        </div>
+
+        <div class="quiz-footer">
+          <p id="quiz-msg" class="info"></p>
+          <button id="next-btn" class="btn-primary" disabled>
+            <span>Submit Answer</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <section id="result-card" class="card glass result-card hidden">
+        <div class="result-icon">🏆</div>
+        <h2>Challenge Completed</h2>
+        <div class="final-score-box">
+          <span class="label">Your Final Score</span>
+          <span id="result-score" class="score-value">0</span>
+        </div>
+        <p id="result-text" class="result-message"></p>
+        <button onclick="window.location.reload()" class="btn-secondary">Try Again</button>
+      </section>
+
+      <section class="leaderboard-section">
+        <div class="section-header">
+          <h2>Live Leaderboard</h2>
+          <div class="live-indicator">
+            <span class="dot"></span> LIVE
+          </div>
+        </div>
+        <div class="table-container glass">
+          <table>
+            <thead>
+              <tr>
+                <th width="80">Rank</th>
+                <th>Participant</th>
+                <th align="right">Score</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
