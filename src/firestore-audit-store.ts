@@ -12,7 +12,11 @@ export class FirestoreAuditStore implements AuditStore {
   }
 
   async append(event: AuditEvent): Promise<void> {
-    await this.db.collection("audit_logs").doc(event.id).set(event);
+    const payload: AuditEvent = { ...event };
+    if (payload.metadata === undefined) {
+      delete payload.metadata;
+    }
+    await this.db.collection("audit_logs").doc(event.id).set(payload);
   }
 
   async list(limit = 100): Promise<AuditEvent[]> {
