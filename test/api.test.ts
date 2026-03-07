@@ -132,4 +132,37 @@ describe("API", () => {
     const state = await request(app).get("/api/event-state").expect(200);
     expect(state.body.status).toBe("paused");
   });
+
+  it("returns queue wait response when active capacity is full", async () => {
+    const engine = new QuizEngine(
+      buildQuestionBank(),
+      new InMemoryAttemptStore(),
+      new InMemoryAuditStore(),
+      new InMemoryEventControlStore(),
+      {
+        maxConcurrentAttempts: 1
+      }
+    );
+    const app = createApp(engine, { adminToken: "secret-token" });
+
+    await request(app)
+      .post("/api/attempts/start")
+      .send({ name: "One", email: "one@example.com" })
+      .expect(201);
+
+    const queued = await request(app)
+      .post("/api/attempts/start")
+      .send({ name: "Two", email: "two@example.com" })
+      .expect(429);
+
+    expect(queued.body.code).toBe("QUEUE_WAIT");
+
+    const queueStatus = await request(app)
+      .get("/api/queue/status")
+      .query({ email: "two@example.com" })
+      .expect(200);
+
+    expect(queueStatus.body.inQueue).toBe(true);
+    expect(queueStatus.body.position).toBe(1);
+  });
 });

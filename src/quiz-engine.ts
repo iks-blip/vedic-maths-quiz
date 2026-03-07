@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import {
   DISCONNECT_GRACE_SECONDS,
+  MAX_CONCURRENT_ATTEMPTS,
   MIN_POINTS_AFTER_20_SECONDS,
   QUESTIONS_PER_ATTEMPT,
   QUIZ_DURATION_SECONDS,
@@ -22,7 +23,12 @@ import {
 import { eventWindowMessage } from "./event-window.js";
 
 export class QuizRuleError extends Error {
-  constructor(message: string, public readonly statusCode: number = 400) {
+  constructor(
+    message: string,
+    public readonly statusCode: number = 400,
+    public readonly errorCode?: string,
+    public readonly details?: Record<string, string | number | boolean>
+  ) {
     super(message);
   }
 }
@@ -34,6 +40,7 @@ interface QuizEngineOptions {
   disconnectGraceSeconds?: number;
   eventStartAtMs?: number;
   eventEndAtMs?: number;
+  maxConcurrentAttempts?: number;
 }
 
 export class QuizEngine {
@@ -43,6 +50,8 @@ export class QuizEngine {
   private readonly disconnectGraceSeconds: number;
   private readonly eventStartAtMs: number;
   private readonly eventEndAtMs: number;
+  private readonly maxConcurrentAttempts: number;
+  private readonly waitingQueue = new Map<string, number>();
 
   constructor(
     private readonly questionBank: Question[],
@@ -57,6 +66,7 @@ export class QuizEngine {
     this.disconnectGraceSeconds = options.disconnectGraceSeconds ?? DISCONNECT_GRACE_SECONDS;
     this.eventStartAtMs = options.eventStartAtMs ?? Number.NEGATIVE_INFINITY;
     this.eventEndAtMs = options.eventEndAtMs ?? Number.POSITIVE_INFINITY;
+    this.maxConcurrentAttempts = options.maxConcurrentAttempts ?? MAX_CONCURRENT_ATTEMPTS;
 
     if (questionBank.length < QUESTIONS_PER_ATTEMPT) {
       throw new Error("Question bank size is below minimum required questions");
@@ -74,6 +84,7 @@ export class QuizEngine {
     if (!normalizedEmail) {
       throw new QuizRuleError("Email is required");
     }
+    await this.assertQueueAvailability(normalizedEmail);
 
     const selectedQuestions = this.selectQuestionsForAttempt();
     const now = this.now();
@@ -97,6 +108,7 @@ export class QuizEngine {
     };
 
     await this.store.saveAttempt(attempt);
+    this.waitingQueue.delete(normalizedEmail);
     await this.logAudit({
       type: "attempt_started",
       attempt
@@ -338,6 +350,34 @@ export class QuizEngine {
     return this.eventControlStore.getState();
   }
 
+  async getQueueStatus(email?: string): Promise<{
+    activeCount: number;
+    maxActive: number;
+    inQueue: boolean;
+    position?: number;
+    canStart: boolean;
+  }> {
+    const normalizedEmail = email?.trim().toLowerCase();
+    const activeCount = await this.getActiveAttemptCount();
+    const queueEmails = [...this.waitingQueue.keys()];
+    const position =
+      normalizedEmail && this.waitingQueue.has(normalizedEmail)
+        ? queueEmails.indexOf(normalizedEmail) + 1
+        : undefined;
+
+    const canStart =
+      activeCount < this.maxConcurrentAttempts &&
+      (queueEmails.length === 0 || (normalizedEmail !== undefined && queueEmails[0] === normalizedEmail));
+
+    return {
+      activeCount,
+      maxActive: this.maxConcurrentAttempts,
+      inQueue: position !== undefined && position > 0,
+      position: position && position > 0 ? position : undefined,
+      canStart
+    };
+  }
+
   async setEventControlState(status: EventControlStatus, actor = "admin"): Promise<EventControlState> {
     const next: EventControlState = {
       status,
@@ -521,6 +561,39 @@ export class QuizEngine {
       throw new QuizRuleError("Attempt is no longer active", 409);
     }
     return attempt;
+  }
+
+  private async assertQueueAvailability(email: string): Promise<void> {
+    const activeCount = await this.getActiveAttemptCount();
+    const queueEmails = [...this.waitingQueue.keys()];
+    const isQueued = this.waitingQueue.has(email);
+    const isQueueActive = queueEmails.length > 0;
+    const isFront = isQueued && queueEmails[0] === email;
+
+    if (!isQueueActive && activeCount < this.maxConcurrentAttempts) {
+      return;
+    }
+
+    if (isFront && activeCount < this.maxConcurrentAttempts) {
+      return;
+    }
+
+    if (!isQueued) {
+      this.waitingQueue.set(email, this.now());
+    }
+
+    const updatedQueue = [...this.waitingQueue.keys()];
+    const position = updatedQueue.indexOf(email) + 1;
+    throw new QuizRuleError("You are in a queue, please wait for your turn.", 429, "QUEUE_WAIT", {
+      position,
+      activeCount,
+      maxActive: this.maxConcurrentAttempts
+    });
+  }
+
+  private async getActiveAttemptCount(): Promise<number> {
+    const attempts = await this.store.listAttempts();
+    return attempts.filter((attempt) => attempt.status === "in_progress").length;
   }
 
   private asSubmittedResponse(attempt: Attempt, reason: string): AnswerResponse {

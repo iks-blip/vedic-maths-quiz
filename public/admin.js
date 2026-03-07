@@ -253,10 +253,27 @@ submissionsBody.addEventListener("click", async (event) => {
 // Navigation Handling
 navItems.forEach(item => {
   item.addEventListener("click", (e) => {
+    e.preventDefault();
     navItems.forEach(i => i.classList.remove("active"));
     item.classList.add("active");
+    
+    // Hide all sections
+    document.querySelectorAll(".content-section").forEach(sec => {
+      sec.classList.add("hidden");
+    });
+    
+    // Show target section
+    const targetId = item.getAttribute("href").substring(1);
+    const targetSec = document.getElementById(targetId);
+    if (targetSec) {
+      targetSec.classList.remove("hidden");
+    }
   });
 });
+
+// Initialize display (ensure only active is shown)
+document.querySelectorAll(".content-section").forEach(sec => sec.classList.add("hidden"));
+document.getElementById("auth").classList.remove("hidden");
 
 tokenInput.value = getToken();
 if (lockTokenInput) {

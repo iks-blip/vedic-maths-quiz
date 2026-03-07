@@ -13,6 +13,7 @@ async function bootstrap() {
   const port = Number(process.env.PORT ?? 3000);
   const host = process.env.HOST ?? "0.0.0.0";
   const useFirebase = process.env.USE_FIREBASE === "1";
+  const maxConcurrentAttempts = Number(process.env.MAX_CONCURRENT_ATTEMPTS ?? 17);
 
   const questionRepository = useFirebase ? new FirestoreQuestionRepository() : new MarkdownQuestionRepository();
   const attemptStore = useFirebase ? new FirestoreAttemptStore() : new InMemoryAttemptStore();
@@ -23,7 +24,8 @@ async function bootstrap() {
   const eventWindow = getEventWindowMs();
   const engine = new QuizEngine(questionBank, attemptStore, auditStore, eventControlStore, {
     eventStartAtMs: eventWindow.startAtMs,
-    eventEndAtMs: eventWindow.endAtMs
+    eventEndAtMs: eventWindow.endAtMs,
+    maxConcurrentAttempts
   });
   const app = createApp(engine, {
     adminToken: process.env.ADMIN_TOKEN ?? "admin-dev-token"

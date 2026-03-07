@@ -258,4 +258,33 @@ describe("QuizEngine", () => {
     await engine.setEventControlState("paused", "tester");
     await expect(engine.getCurrentQuestion(started.attemptId)).rejects.toThrow("Event is paused by admin");
   });
+
+  it("queues users when active attempt capacity is full", async () => {
+    let now = 1_000;
+    const engine = new QuizEngine(
+      buildQuestionBank(),
+      new InMemoryAttemptStore(),
+      new InMemoryAuditStore(),
+      new InMemoryEventControlStore(),
+      {
+        now: () => now,
+        maxConcurrentAttempts: 1
+      }
+    );
+
+    const first = await engine.startAttempt("A", "one@example.com");
+    await expect(engine.startAttempt("B", "two@example.com")).rejects.toMatchObject({
+      statusCode: 429,
+      errorCode: "QUEUE_WAIT"
+    });
+
+    const queueStatus = await engine.getQueueStatus("two@example.com");
+    expect(queueStatus.inQueue).toBe(true);
+    expect(queueStatus.position).toBe(1);
+    expect(queueStatus.canStart).toBe(false);
+
+    await engine.disqualifyAttempt(first.attemptId, "tester");
+    const queueStatusAfter = await engine.getQueueStatus("two@example.com");
+    expect(queueStatusAfter.canStart).toBe(true);
+  });
 });

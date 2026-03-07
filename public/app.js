@@ -7,12 +7,18 @@ const state = {
   deadlineAtMs: null,
   timerInterval: null,
   heartbeatInterval: null,
-  submitted: false
+  submitted: false,
+  queuedName: null,
+  queuedEmail: null,
+  queueInterval: null
 };
 
 const startCard = document.getElementById("start-card");
 const startForm = document.getElementById("start-form");
 const startError = document.getElementById("start-error");
+const queueCard = document.getElementById("queue-card");
+const queueStatusEl = document.getElementById("queue-status");
+const queuePositionEl = document.getElementById("queue-position");
 const quizCard = document.getElementById("quiz-card");
 const resultCard = document.getElementById("result-card");
 const resultText = document.getElementById("result-text");
@@ -35,12 +41,21 @@ async function api(path, options = {}) {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || "Request failed");
+    const error = new Error(body.error || "Request failed");
+    error.status = response.status;
+    error.code = body.code;
+    error.details = body.details;
+    throw error;
   }
   if (response.status === 204) {
     return null;
   }
   return response.json();
+}
+
+async function requestQueueStatus(email) {
+  const encoded = encodeURIComponent(email);
+  return api(`/api/queue/status?email=${encoded}`);
 }
 
 function formatSeconds(totalSeconds) {
@@ -137,6 +152,9 @@ function finalizeQuiz(finalScore, reason) {
   if (state.heartbeatInterval) {
     clearInterval(state.heartbeatInterval);
   }
+  if (state.queueInterval) {
+    clearInterval(state.queueInterval);
+  }
   loadLeaderboard();
 }
 
@@ -154,11 +172,93 @@ async function loadLeaderboard() {
   });
 }
 
+function showQueueCard(payload) {
+  startCard.classList.add("hidden");
+  quizCard.classList.add("hidden");
+  resultCard.classList.add("hidden");
+  queueCard.classList.remove("hidden");
+
+  const position = payload?.details?.position ?? payload?.position;
+  const activeCount = payload?.details?.activeCount ?? payload?.activeCount;
+  const maxActive = payload?.details?.maxActive ?? payload?.maxActive;
+  queueStatusEl.textContent = "As you are in a queue, please wait. We will start once a slot opens.";
+  queuePositionEl.textContent =
+    position && activeCount !== undefined && maxActive !== undefined
+      ? `Queue position: ${position} | Active players: ${activeCount}/${maxActive}`
+      : position
+        ? `Queue position: ${position}`
+        : "Queueing...";
+}
+
+async function tryStartQueuedAttempt() {
+  if (!state.queuedName || !state.queuedEmail) {
+    return;
+  }
+  try {
+    const started = await api("/api/attempts/start", {
+      method: "POST",
+      body: JSON.stringify({ name: state.queuedName, email: state.queuedEmail })
+    });
+
+    state.attemptId = started.attemptId;
+    state.currentQuestion = started.question;
+    state.progress = { answered: 0, total: started.totalQuestions };
+    state.score = 0;
+    state.deadlineAtMs = new Date(started.deadlineAt).getTime();
+    state.submitted = false;
+    if (state.queueInterval) {
+      clearInterval(state.queueInterval);
+      state.queueInterval = null;
+    }
+
+    queueCard.classList.add("hidden");
+    quizCard.classList.remove("hidden");
+
+    if (state.queueInterval) {
+      clearInterval(state.queueInterval);
+      state.queueInterval = null;
+    }
+
+    renderQuestion();
+    startTimer();
+    startHeartbeat();
+    loadLeaderboard();
+  } catch (error) {
+    if (error.code === "QUEUE_WAIT") {
+      showQueueCard(error);
+    } else {
+      queueStatusEl.textContent = error.message;
+    }
+  }
+}
+
+function startQueuePolling() {
+  if (state.queueInterval) {
+    clearInterval(state.queueInterval);
+  }
+  state.queueInterval = setInterval(async () => {
+    if (!state.queuedEmail) {
+      return;
+    }
+    try {
+      const status = await requestQueueStatus(state.queuedEmail);
+      showQueueCard(status);
+      if (status.canStart) {
+        await tryStartQueuedAttempt();
+      }
+    } catch {
+      // Ignore temporary queue polling failures.
+    }
+  }, 5000);
+}
+
 startForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   startError.textContent = "";
   const name = document.getElementById("name").value;
   const email = document.getElementById("email").value;
+  state.queuedName = name;
+  state.queuedEmail = email;
 
   try {
     const started = await api("/api/attempts/start", {
@@ -174,6 +274,7 @@ startForm.addEventListener("submit", async (event) => {
     state.submitted = false;
 
     startCard.classList.add("hidden");
+    queueCard.classList.add("hidden");
     quizCard.classList.remove("hidden");
 
     renderQuestion();
@@ -181,6 +282,11 @@ startForm.addEventListener("submit", async (event) => {
     startHeartbeat();
     loadLeaderboard();
   } catch (error) {
+    if (error.code === "QUEUE_WAIT") {
+      showQueueCard(error);
+      startQueuePolling();
+      return;
+    }
     startError.textContent = error.message;
   }
 });

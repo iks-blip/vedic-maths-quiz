@@ -97,6 +97,15 @@ export function createApp(engine: QuizEngine, options: AppOptions) {
     }
   });
 
+  app.get("/api/queue/status", async (req, res, next) => {
+    try {
+      const email = typeof req.query.email === "string" ? req.query.email : undefined;
+      res.json(await engine.getQueueStatus(email));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.use("/api/attempts", publicRateLimit);
   app.use("/api/admin", adminRateLimit);
 
@@ -265,7 +274,7 @@ export function createApp(engine: QuizEngine, options: AppOptions) {
 
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (error instanceof QuizRuleError) {
-      res.status(error.statusCode).json({ error: error.message });
+      res.status(error.statusCode).json({ error: error.message, code: error.errorCode, details: error.details });
       return;
     }
     if (error instanceof z.ZodError) {
