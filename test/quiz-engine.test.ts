@@ -31,6 +31,28 @@ describe("QuizEngine", () => {
     expect(new Set(normalizedTexts).size).toBe(normalizedTexts.length);
   });
 
+  it("prevents repeated question text across difficulties in one attempt", async () => {
+    const bank = buildQuestionBank();
+    bank[25].text = bank[0].text;
+    bank[50].text = bank[0].text;
+
+    const engine = new QuizEngine(
+      bank,
+      new InMemoryAttemptStore(),
+      new InMemoryAuditStore(),
+      new InMemoryEventControlStore(),
+      {
+        now: () => 1_000,
+        random: () => 0.01
+      }
+    );
+
+    const started = await engine.startAttempt("A", "dedupe@example.com");
+    const attempt = await engine.getAttemptForTesting(started.attemptId);
+    const normalizedTexts = attempt?.questions.map((q) => q.text.trim().toLowerCase()) ?? [];
+    expect(new Set(normalizedTexts).size).toBe(normalizedTexts.length);
+  });
+
   it("shuffles options so correct answer is not fixed to option A position", async () => {
     const engine = new QuizEngine(
       buildQuestionBank(),

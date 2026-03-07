@@ -441,22 +441,41 @@ export class QuizEngine {
   }
 
   private selectQuestionsForAttempt(): Question[] {
-    const easy = this.pickRandomByDifficulty("easy", TARGET_DISTRIBUTION.easy);
-    const medium = this.pickRandomByDifficulty("medium", TARGET_DISTRIBUTION.medium);
-    const hard = this.pickRandomByDifficulty("hard", TARGET_DISTRIBUTION.hard);
+    const usedTexts = new Set<string>();
+    const easy = this.pickRandomByDifficulty("easy", TARGET_DISTRIBUTION.easy, usedTexts);
+    const medium = this.pickRandomByDifficulty("medium", TARGET_DISTRIBUTION.medium, usedTexts);
+    const hard = this.pickRandomByDifficulty("hard", TARGET_DISTRIBUTION.hard, usedTexts);
 
     const selected = [...easy, ...medium, ...hard];
     return this.shuffle(selected).map((question) => this.randomizeQuestionOptions(question));
   }
 
-  private pickRandomByDifficulty(difficulty: "easy" | "medium" | "hard", count: number): Question[] {
+  private pickRandomByDifficulty(
+    difficulty: "easy" | "medium" | "hard",
+    count: number,
+    usedTexts?: Set<string>
+  ): Question[] {
     const pool = this.deduplicateByText(
-      this.questionBank.filter((question) => question.difficulty === difficulty)
+      this.questionBank.filter((question) => {
+        if (question.difficulty !== difficulty) {
+          return false;
+        }
+        if (!usedTexts) {
+          return true;
+        }
+        return !usedTexts.has(this.normalizeQuestionText(question.text));
+      })
     );
     if (pool.length < count) {
       throw new Error(`Insufficient question pool for difficulty '${difficulty}'`);
     }
-    return this.shuffle(pool).slice(0, count);
+    const picked = this.shuffle(pool).slice(0, count);
+    if (usedTexts) {
+      for (const question of picked) {
+        usedTexts.add(this.normalizeQuestionText(question.text));
+      }
+    }
+    return picked;
   }
 
   private shuffle<T>(items: T[]): T[] {
@@ -480,7 +499,7 @@ export class QuizEngine {
     const seen = new Set<string>();
     const unique: Question[] = [];
     for (const question of questions) {
-      const key = question.text.trim().toLowerCase();
+      const key = this.normalizeQuestionText(question.text);
       if (seen.has(key)) {
         continue;
       }
@@ -488,6 +507,10 @@ export class QuizEngine {
       unique.push(question);
     }
     return unique;
+  }
+
+  private normalizeQuestionText(text: string): string {
+    return text.trim().toLowerCase();
   }
 
   private createInitialPowerups(): AttemptPowerups {
