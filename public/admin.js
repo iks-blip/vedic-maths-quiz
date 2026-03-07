@@ -11,6 +11,10 @@ const eventUpdated = document.getElementById("event-updated");
 const eventStartBtn = document.getElementById("event-start");
 const eventPauseBtn = document.getElementById("event-pause");
 const eventStopBtn = document.getElementById("event-stop");
+const lockOverlay = document.getElementById("lock-overlay");
+const lockTokenInput = document.getElementById("lock-token");
+const unlockAdminBtn = document.getElementById("unlock-admin");
+const lockMsg = document.getElementById("lock-msg");
 
 const leaderboardCount = document.getElementById("leaderboard-count");
 const submissionsCount = document.getElementById("submissions-count");
@@ -24,6 +28,16 @@ function getToken() {
 
 function setToken(token) {
   localStorage.setItem("adminToken", token);
+}
+
+function setLocked(locked) {
+  if (locked) {
+    document.body.classList.add("locked-admin");
+    lockOverlay?.setAttribute("aria-hidden", "false");
+  } else {
+    document.body.classList.remove("locked-admin");
+    lockOverlay?.setAttribute("aria-hidden", "true");
+  }
 }
 
 async function adminApi(path, options = {}) {
@@ -140,14 +154,25 @@ async function loadDashboard() {
 
     authMsg.textContent = "Authorization Active";
     authMsg.style.color = "var(--success)";
+    if (lockMsg) {
+      lockMsg.textContent = "Unlocked";
+    }
+    setLocked(false);
   } catch (error) {
     authMsg.textContent = error.message;
     authMsg.style.color = "var(--danger)";
+    if (lockMsg) {
+      lockMsg.textContent = error.message;
+    }
+    setLocked(true);
   }
 }
 
 saveTokenBtn.addEventListener("click", () => {
   setToken(tokenInput.value.trim());
+  if (lockTokenInput) {
+    lockTokenInput.value = tokenInput.value.trim();
+  }
   loadDashboard();
 });
 
@@ -192,6 +217,13 @@ eventStartBtn.addEventListener("click", () => updateEventState("active"));
 eventPauseBtn.addEventListener("click", () => updateEventState("paused"));
 eventStopBtn.addEventListener("click", () => updateEventState("stopped"));
 
+unlockAdminBtn?.addEventListener("click", () => {
+  const token = lockTokenInput?.value.trim() ?? "";
+  setToken(token);
+  tokenInput.value = token;
+  loadDashboard();
+});
+
 submissionsBody.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) {
@@ -227,6 +259,11 @@ navItems.forEach(item => {
 });
 
 tokenInput.value = getToken();
+if (lockTokenInput) {
+  lockTokenInput.value = getToken();
+}
 if (getToken()) {
   loadDashboard();
+} else {
+  setLocked(true);
 }

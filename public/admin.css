@@ -3,6 +3,33 @@
   height: 100vh;
 }
 
+.lock-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  background: rgba(8, 12, 20, 0.35);
+}
+
+.lock-card {
+  width: min(92vw, 420px);
+  padding: 24px;
+  display: grid;
+  gap: 12px;
+}
+
+.locked-admin .admin-layout {
+  filter: blur(8px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.locked-admin .lock-overlay {
+  display: flex;
+}
+
 .admin-layout {
   display: flex;
   height: 100vh;

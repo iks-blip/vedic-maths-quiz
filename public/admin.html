@@ -10,8 +10,18 @@
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/admin.css" />
   </head>
-  <body class="admin-body">
+  <body class="admin-body locked-admin">
     <div class="bg-pattern"></div>
+    <div id="lock-overlay" class="lock-overlay">
+      <div class="lock-card glass">
+        <h2>Admin Access Required</h2>
+        <p>Enter admin token to unlock dashboard.</p>
+        <label for="lock-token">Admin Token</label>
+        <input id="lock-token" type="password" placeholder="••••••••••••••••" />
+        <button id="unlock-admin" class="btn-primary">Unlock Dashboard</button>
+        <p id="lock-msg" class="status-badge">Locked</p>
+      </div>
+    </div>
     
     <div class="admin-layout">
       <aside class="admin-sidebar glass">

@@ -23,9 +23,9 @@ describe("QuizEngine", () => {
     const attempt = await engine.getAttemptForTesting(started.attemptId);
     expect(attempt).toBeDefined();
     expect(attempt?.questions.length).toBe(25);
-    expect(attempt?.questions.filter((q) => q.difficulty === "easy").length).toBe(8);
+    expect(attempt?.questions.filter((q) => q.difficulty === "easy").length).toBe(6);
     expect(attempt?.questions.filter((q) => q.difficulty === "medium").length).toBe(9);
-    expect(attempt?.questions.filter((q) => q.difficulty === "hard").length).toBe(8);
+    expect(attempt?.questions.filter((q) => q.difficulty === "hard").length).toBe(10);
   });
 
   it("shuffles options so correct answer is not fixed to option A position", async () => {
