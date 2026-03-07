@@ -21,6 +21,7 @@ const progressEl = document.getElementById("progress");
 const progressBar = document.getElementById("progress-bar");
 const scoreEl = document.getElementById("score");
 const timerEl = document.getElementById("timer");
+const questionAnimator = document.getElementById("question-animator");
 const questionText = document.getElementById("question-text");
 const optionsEl = document.getElementById("options");
 const nextBtn = document.getElementById("next-btn");
@@ -202,8 +203,17 @@ nextBtn.addEventListener("click", async () => {
       return;
     }
 
-    state.currentQuestion = response.question;
-    renderQuestion();
+    questionAnimator.classList.add("question-fade-exit");
+    setTimeout(() => {
+      state.currentQuestion = response.question;
+      renderQuestion();
+      questionAnimator.classList.remove("question-fade-exit");
+      questionAnimator.classList.add("question-fade-enter");
+      
+      setTimeout(() => {
+        questionAnimator.classList.remove("question-fade-enter");
+      }, 400);
+    }, 300);
   } catch (error) {
     quizMsg.textContent = error.message;
   }
@@ -244,5 +254,51 @@ window.addEventListener("pagehide", () => {
   navigator.sendBeacon(`/api/attempts/${state.attemptId}/void`);
 });
 
+// Fun Falling Symbols Animation
+function initFallingSymbols() {
+  const container = document.getElementById("math-symbols-container");
+  const symbols = ['+', '-', '×', '÷', '∑', '∫', 'π', '∞', '√', '∆', '∇', 'μ', 'Ω', 'θ', 'φ', 'α', 'β', '≈', '≠'];
+  const colors = ['#FF4D4D', '#3B82F6', '#FCD34D', '#10B981', '#8B5CF6', '#111827'];
+  
+  function createSymbol() {
+    const el = document.createElement("div");
+    el.className = "math-symbol";
+    el.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+    
+    const leftPos = Math.random() * 100;
+    const duration = 5 + Math.random() * 10;
+    const fontSize = 1.5 + Math.random() * 3;
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    
+    el.style.left = `${leftPos}vw`;
+    el.style.animationDuration = `${duration}s`;
+    el.style.fontSize = `${fontSize}rem`;
+    el.style.color = color;
+    
+    // Add neo-brutalist shadow
+    if (color === '#111827') {
+      el.style.textShadow = '3px 3px 0px #FFFFFF';
+    } else {
+      el.style.textShadow = '3px 3px 0px #111827';
+    }
+    
+    container.appendChild(el);
+    
+    setTimeout(() => {
+      if (el.parentNode === container) {
+        container.removeChild(el);
+      }
+    }, duration * 1000);
+  }
+  
+  // Create symbols periodically
+  setInterval(createSymbol, 800);
+  // Initial batch
+  for (let i = 0; i < 5; i++) {
+    setTimeout(createSymbol, i * 200);
+  }
+}
+
+initFallingSymbols();
 loadLeaderboard();
 setInterval(loadLeaderboard, 15000);

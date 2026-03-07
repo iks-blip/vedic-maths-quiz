@@ -3,56 +3,75 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vedic Maths Challenge</title>
+    <title>Vedic Maths Challenge | Sandip University & IKS</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="bg-pattern"></div>
+    <div class="bg-grid"></div>
+    <div id="math-symbols-container" class="symbols-container"></div>
+    
     <main class="container">
-      <header class="hero">
-        <div class="logo-mark">∑</div>
-        <h1>Vedic Maths <span class="accent">Challenge</span></h1>
-        <p class="subtitle">25 questions • 20 minutes • High Stakes</p>
+      <header class="hero animate-pop-in">
+        <div class="organizers">
+          <span class="org-text">Organized by</span>
+          <div class="org-logos">
+            <img src="/assets/sun-logo.jpg" alt="Sandip University" class="org-logo sun-logo" />
+            <span class="org-divider">+</span>
+            <img src="/assets/iks-logo.png" alt="Indian Knowledge Systems" class="org-logo iks-logo" />
+          </div>
+        </div>
+        <h1 class="title-3d">Vedic Maths<br><span class="highlight-text">Challenge</span></h1>
+        <div class="pills-container">
+          <span class="brutal-pill bg-accent">25 Questions</span>
+          <span class="brutal-pill bg-primary text-white">20 Minutes</span>
+          <span class="brutal-pill bg-secondary text-white">High Stakes</span>
+        </div>
       </header>
 
-      <section id="start-card" class="card glass">
-        <div class="card-header">
-          <h2>Begin Your Journey</h2>
-          <p>Enter your details to start the competitive attempt.</p>
-        </div>
+      <section id="start-card" class="brutal-card animate-slide-up">
+        <h2 class="bricolage start-title">Ready Player One?</h2>
+        <p class="start-subtitle">Enter your details to enter the arena.</p>
+        
         <form id="start-form">
           <div class="input-group">
-            <label for="name">Full Name</label>
-            <input id="name" placeholder="Aryabhatta" required />
+            <label for="name">Your Name</label>
+            <input id="name" class="brutal-input" placeholder="Aryabhatta" required />
           </div>
           <div class="input-group">
             <label for="email">Email Address</label>
-            <input id="email" type="email" placeholder="scholar@gurukul.edu" required />
+            <input id="email" type="email" class="brutal-input" placeholder="scholar@gurukul.edu" required />
           </div>
-          <button type="submit" class="btn-primary">
-            <span>Start Quiz</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <button type="submit" class="brutal-btn bg-primary text-white">
+            START QUIZ
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
         </form>
         <p id="start-error" class="error"></p>
       </section>
 
-      <section id="quiz-card" class="card glass hidden">
+      <section id="quiz-card" class="brutal-card hidden">
+        <div class="quiz-top-bar">
+          <div class="quiz-organizers-small">
+            <img src="/assets/sun-logo.jpg" alt="Sandip University" class="org-logo-small sun-logo" />
+            <img src="/assets/iks-logo.png" alt="IKS" class="org-logo-small iks-logo" />
+          </div>
+        </div>
+        
         <div class="quiz-header">
-          <div class="stat">
-            <span class="label">Progress</span>
-            <span id="progress" class="value">01/25</span>
+          <div class="stat-box">
+            <span class="stat-label">Progress</span>
+            <span id="progress" class="stat-value">01/25</span>
           </div>
-          <div class="stat">
-            <span class="label">Current Score</span>
-            <span id="score" class="value highlight">0</span>
+          <div class="stat-box">
+            <span class="stat-label">Score</span>
+            <span id="score" class="stat-value highlight-text">0</span>
           </div>
-          <div class="stat timer-stat">
-            <span class="label">Time Remaining</span>
-            <span id="timer" class="value">20:00</span>
+          <div class="stat-box timer-box">
+            <span class="stat-label">Time Left</span>
+            <span id="timer" class="stat-value">20:00</span>
           </div>
         </div>
         
@@ -60,39 +79,42 @@
           <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
         </div>
 
-        <div class="question-container">
-          <h2 id="question-text"></h2>
+        <div id="question-animator" class="question-container">
+          <h2 id="question-text" class="question-text bricolage"></h2>
           <div id="options" class="options-grid"></div>
         </div>
 
         <div class="quiz-footer">
           <p id="quiz-msg" class="info"></p>
-          <button id="next-btn" class="btn-primary" disabled>
-            <span>Submit Answer</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <button id="next-btn" class="brutal-btn bg-secondary text-white" disabled>
+            SUBMIT ANSWER
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
         </div>
       </section>
 
-      <section id="result-card" class="card glass result-card hidden">
-        <div class="result-icon">🏆</div>
-        <h2>Challenge Completed</h2>
+      <section id="result-card" class="brutal-card result-card hidden">
+        <div class="result-icon">🎯</div>
+        <h2 class="bricolage result-title">Game Over!</h2>
         <div class="final-score-box">
-          <span class="label">Your Final Score</span>
+          <span class="stat-label score-label">Final Score</span>
           <span id="result-score" class="score-value">0</span>
         </div>
-        <p id="result-text" class="result-message"></p>
-        <button onclick="window.location.reload()" class="btn-secondary">Try Again</button>
+        <p id="result-text" class="info result-info"></p>
+        <button onclick="window.location.reload()" class="brutal-btn bg-accent">
+          PLAY AGAIN
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+        </button>
       </section>
 
-      <section class="leaderboard-section">
+      <section class="leaderboard-section animate-slide-up-delayed">
         <div class="section-header">
           <h2>Live Leaderboard</h2>
           <div class="live-indicator">
             <span class="dot"></span> LIVE
           </div>
         </div>
-        <div class="table-container glass">
+        <div class="table-container">
           <table>
             <thead>
               <tr>

@@ -18,7 +18,7 @@
         <p>Enter admin token to unlock dashboard.</p>
         <label for="lock-token">Admin Token</label>
         <input id="lock-token" type="password" placeholder="••••••••••••••••" />
-        <button id="unlock-admin" class="btn-primary">Unlock Dashboard</button>
+        <button id="unlock-admin" type="button" class="btn-primary">Unlock Dashboard</button>
         <p id="lock-msg" class="status-badge">Locked</p>
       </div>
     </div>
@@ -26,7 +26,6 @@
     <div class="admin-layout">
       <aside class="admin-sidebar glass">
         <div class="sidebar-header">
-          <div class="logo-mark">∑</div>
           <h2>Admin <span class="accent">Portal</span></h2>
         </div>
         <nav class="sidebar-nav">
@@ -48,7 +47,7 @@
           </a>
         </nav>
         <div class="sidebar-footer">
-          <button id="refresh-all" class="btn-icon">
+          <button id="refresh-all" type="button" class="btn-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             Refresh Data
           </button>
@@ -62,7 +61,7 @@
             <p id="auth-msg" class="status-badge">Awaiting Authorization...</p>
           </div>
           <div class="header-actions">
-            <button id="export-csv" class="btn-secondary">
+            <button id="export-csv" type="button" class="btn-secondary">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
               Export CSV
             </button>
@@ -80,7 +79,7 @@
                 <label for="admin-token">Admin Token</label>
                 <input id="admin-token" type="password" placeholder="••••••••••••••••" />
               </div>
-              <button id="save-token" class="btn-primary">Initialize Session</button>
+              <button id="save-token" type="button" class="btn-primary">Initialize Session</button>
             </div>
           </div>
         </section>
@@ -92,9 +91,9 @@
           </div>
           <div class="card glass">
             <div class="toolbar">
-              <button id="event-start" class="btn-secondary">Start</button>
-              <button id="event-pause" class="btn-secondary">Pause</button>
-              <button id="event-stop" class="btn-secondary">Stop</button>
+              <button id="event-start" type="button" class="btn-secondary">Start</button>
+              <button id="event-pause" type="button" class="btn-secondary">Pause</button>
+              <button id="event-stop" type="button" class="btn-secondary">Stop</button>
             </div>
             <p id="event-updated" class="text-muted"></p>
           </div>

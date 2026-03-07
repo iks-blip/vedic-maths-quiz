@@ -136,7 +136,7 @@ async function loadDashboard() {
            <td align="right">${item.score}</td>
            <td>${item.voidReason ? `<span class="void-status">${item.voidReason}</span>` : '<span class="success-text">Success</span>'}</td>
            <td>${(item.suspiciousReasons || []).map((x) => `<span class="status-badge">${escapeHtml(x)}</span>`).join(" ")}</td>
-           <td>${item.isDisqualified ? '<span class="void-status">Disqualified</span>' : `<button class="btn-secondary disqualify-btn" data-attempt-id="${item.id}">Disqualify</button>`}</td>`
+           <td>${item.isDisqualified ? '<span class="void-status">Disqualified</span>' : `<button type="button" class="btn-secondary disqualify-btn" data-attempt-id="${item.id}">Disqualify</button>`}</td>`
       )
     );
 

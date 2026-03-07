@@ -373,7 +373,9 @@ export class QuizEngine {
   }
 
   private pickRandomByDifficulty(difficulty: "easy" | "medium" | "hard", count: number): Question[] {
-    const pool = this.questionBank.filter((question) => question.difficulty === difficulty);
+    const pool = this.deduplicateByText(
+      this.questionBank.filter((question) => question.difficulty === difficulty)
+    );
     if (pool.length < count) {
       throw new Error(`Insufficient question pool for difficulty '${difficulty}'`);
     }
@@ -395,6 +397,20 @@ export class QuizEngine {
       ...question,
       options: shuffledOptions
     };
+  }
+
+  private deduplicateByText(questions: Question[]): Question[] {
+    const seen = new Set<string>();
+    const unique: Question[] = [];
+    for (const question of questions) {
+      const key = question.text.trim().toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      unique.push(question);
+    }
+    return unique;
   }
 
   private pointsForTime(seconds: number): number {

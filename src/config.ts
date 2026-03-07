@@ -2,9 +2,9 @@ export const QUIZ_DURATION_SECONDS = 20 * 60;
 export const DISCONNECT_GRACE_SECONDS = 60;
 export const QUESTIONS_PER_ATTEMPT = 25;
 export const TARGET_DISTRIBUTION = {
-  easy: 6,
-  medium: 9,
-  hard: 10
+  easy: 5,
+  medium: 5,
+  hard: 15
 } as const;
 
 export const SCORE_THRESHOLDS = [

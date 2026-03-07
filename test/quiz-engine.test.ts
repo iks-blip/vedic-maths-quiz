@@ -6,7 +6,7 @@ import { InMemoryEventControlStore } from "../src/event-control-store.js";
 import { buildQuestionBank } from "./helpers.js";
 
 describe("QuizEngine", () => {
-  it("selects 25 questions with 8/9/8 difficulty split", async () => {
+  it("selects 25 questions with 5/5/15 difficulty split and no repeated texts", async () => {
     let now = 1_000;
     const engine = new QuizEngine(
       buildQuestionBank(),
@@ -23,9 +23,12 @@ describe("QuizEngine", () => {
     const attempt = await engine.getAttemptForTesting(started.attemptId);
     expect(attempt).toBeDefined();
     expect(attempt?.questions.length).toBe(25);
-    expect(attempt?.questions.filter((q) => q.difficulty === "easy").length).toBe(6);
-    expect(attempt?.questions.filter((q) => q.difficulty === "medium").length).toBe(9);
-    expect(attempt?.questions.filter((q) => q.difficulty === "hard").length).toBe(10);
+    expect(attempt?.questions.filter((q) => q.difficulty === "easy").length).toBe(5);
+    expect(attempt?.questions.filter((q) => q.difficulty === "medium").length).toBe(5);
+    expect(attempt?.questions.filter((q) => q.difficulty === "hard").length).toBe(15);
+
+    const normalizedTexts = attempt?.questions.map((q) => q.text.trim().toLowerCase()) ?? [];
+    expect(new Set(normalizedTexts).size).toBe(normalizedTexts.length);
   });
 
   it("shuffles options so correct answer is not fixed to option A position", async () => {
