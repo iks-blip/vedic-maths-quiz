@@ -8,9 +8,11 @@ const state = {
   timerInterval: null,
   heartbeatInterval: null,
   submitted: false,
+  powerups: null,
   queuedName: null,
   queuedEmail: null,
-  queueInterval: null
+  queueInterval: null,
+  lastPowerupMarker: null
 };
 
 const startCard = document.getElementById("start-card");
@@ -33,6 +35,8 @@ const optionsEl = document.getElementById("options");
 const nextBtn = document.getElementById("next-btn");
 const quizMsg = document.getElementById("quiz-msg");
 const leaderboardBody = document.getElementById("leaderboard-body");
+const powerupPopup = document.getElementById("powerup-popup");
+const powerupPopupText = document.getElementById("powerup-popup-text");
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -81,7 +85,12 @@ function renderQuestion() {
   scoreEl.textContent = state.score;
   optionsEl.innerHTML = "";
 
+  const hiddenOptions =
+    state.powerups?.eliminatedOptionsByQuestionId?.[state.currentQuestion.id] ?? [];
   state.currentQuestion.options.forEach((opt) => {
+    if (hiddenOptions.includes(opt)) {
+      return;
+    }
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "option-btn";
@@ -108,7 +117,10 @@ function startTimer() {
       return;
     }
     const remaining = Math.floor((state.deadlineAtMs - Date.now()) / 1000);
-    timerEl.textContent = formatSeconds(remaining);
+    const frozenForCurrent =
+      state.powerups?.frozenQuestionId === state.currentQuestion?.id &&
+      state.powerups?.frozenStartedAt;
+    timerEl.textContent = frozenForCurrent ? "FROZEN" : formatSeconds(remaining);
     
     if (remaining <= 60) {
       timerEl.style.color = "var(--danger)";
@@ -158,6 +170,35 @@ function finalizeQuiz(finalScore, reason) {
   loadLeaderboard();
 }
 
+function applyPowerupState(powerups) {
+  state.powerups = powerups || null;
+  if (!state.powerups?.lastUnlockedPowerup || !state.powerups?.lastUnlockedStreak) {
+    return;
+  }
+  const marker = `${state.powerups.lastUnlockedPowerup}:${state.powerups.lastUnlockedStreak}`;
+  if (state.lastPowerupMarker === marker) {
+    return;
+  }
+  state.lastPowerupMarker = marker;
+  showPowerupPopup(state.powerups.lastUnlockedPowerup);
+}
+
+function powerupLabel(type) {
+  if (type === "eliminate_two") return "Eliminate 2 options";
+  if (type === "time_freeze") return "Time Freeze";
+  if (type === "double_score") return "Double Score";
+  return "Shield";
+}
+
+function showPowerupPopup(type) {
+  if (!powerupPopup || !powerupPopupText) {
+    return;
+  }
+  powerupPopupText.textContent = `${powerupLabel(type)} activated for this question!`;
+  powerupPopup.classList.remove("hidden");
+  setTimeout(() => powerupPopup.classList.add("hidden"), 2600);
+}
+
 async function loadLeaderboard() {
   const leaderboard = await api("/api/leaderboard");
   leaderboardBody.innerHTML = "";
@@ -205,6 +246,7 @@ async function tryStartQueuedAttempt() {
     state.progress = { answered: 0, total: started.totalQuestions };
     state.score = 0;
     state.deadlineAtMs = new Date(started.deadlineAt).getTime();
+    applyPowerupState(started.powerups);
     state.submitted = false;
     if (state.queueInterval) {
       clearInterval(state.queueInterval);
@@ -271,6 +313,7 @@ startForm.addEventListener("submit", async (event) => {
     state.progress = { answered: 0, total: started.totalQuestions };
     state.score = 0;
     state.deadlineAtMs = new Date(started.deadlineAt).getTime();
+    applyPowerupState(started.powerups);
     state.submitted = false;
 
     startCard.classList.add("hidden");
@@ -303,6 +346,7 @@ nextBtn.addEventListener("click", async () => {
 
     state.score = response.score;
     state.progress = response.progress;
+    applyPowerupState(response.powerups);
 
     if (response.status === "submitted") {
       finalizeQuiz(response.score, response.reason);

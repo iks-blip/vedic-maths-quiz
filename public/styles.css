@@ -106,7 +106,6 @@ h1, h2, h3, .bricolage {
   border: 3px solid var(--border);
   border-radius: 16px;
   box-shadow: 4px 4px 0px var(--shadow-color);
-  transform: rotate(-2deg);
 }
 
 .org-text {
@@ -119,19 +118,35 @@ h1, h2, h3, .bricolage {
   text-transform: uppercase;
 }
 
-.org-logos {
+.org-iks-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 16px;
+  margin-top: 8px;
+}
+
+.org-iks-text {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--text);
+  line-height: 1.2;
+  text-align: left;
+  max-width: 280px;
+}
+
+.org-sun-row {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 3px dashed var(--border);
 }
 
 .org-logo { height: 50px; object-fit: contain; }
-.sun-logo { border-radius: 4px; }
-.org-divider {
-  font-family: 'Bricolage Grotesque', sans-serif;
-  font-size: 2rem;
-  font-weight: 800;
-}
+.sun-logo { border-radius: 4px; height: 70px; }
 
 /* Pills */
 .pills-container {
@@ -293,6 +308,19 @@ label {
   background: var(--secondary);
   border-right: 3px solid var(--border);
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.powerup-popup {
+  border: 3px solid var(--border);
+  background: var(--green);
+  color: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  box-shadow: 4px 4px 0 var(--shadow-color);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .question-text {
@@ -502,9 +530,12 @@ tr:nth-child(even) { background: #F9FAFB; }
   }
   .title-3d { font-size: 2.5rem; text-shadow: 2px 2px 0px white, 4px 4px 0px var(--border); margin: 16px 0; }
   .hero { align-items: center; width: 100%; }
-  .organizers { padding: 12px 16px; width: 100%; max-width: 320px; }
-  .org-logos { gap: 12px; }
-  .org-logo { height: 36px; }
+  .organizers { padding: 12px 16px; width: 100%; max-width: 100%; }
+  .org-iks-row { flex-direction: row; text-align: left; gap: 12px; }
+  .org-iks-text { text-align: left; font-size: 1rem; max-width: none; }
+  .org-sun-row { padding-top: 12px; margin-top: 8px; }
+  .org-logo { height: 40px; }
+  .sun-logo { height: 60px; }
   .options-grid { grid-template-columns: 1fr; }
   .quiz-header { grid-template-columns: 1fr; gap: 8px; }
   .timer-box { grid-column: auto; }

@@ -9,10 +9,17 @@ export const TARGET_DISTRIBUTION = {
 } as const;
 
 export const SCORE_THRESHOLDS = [
-  { maxSeconds: 10, points: 10 },
-  { maxSeconds: 15, points: 8 },
-  { maxSeconds: 20, points: 6 }
+  { maxSeconds: 20, points: 40 },
+  { maxSeconds: 32, points: 32 },
+  { maxSeconds: 48, points: 24 }
 ] as const;
 
-export const MIN_POINTS_AFTER_20_SECONDS = 4;
+export const MIN_POINTS_AFTER_20_SECONDS = 16;
 export const CERTIFICATE_MIN_SCORE = 180;
+
+export const POWERUP_UNLOCK_STREAKS = {
+  eliminate_two: 5,
+  time_freeze: 10,
+  double_score: 15,
+  shield: 20
+} as const;

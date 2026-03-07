@@ -70,23 +70,27 @@ describe("QuizEngine", () => {
 
     now += 9_000;
     let response = await engine.answerAttempt(started.attemptId, "A");
-    expect(response.score).toBe(10);
+    expect(response.score).toBe(40);
 
     now += 12_000;
     response = await engine.answerAttempt(started.attemptId, "A");
-    expect(response.score).toBe(18);
+    expect(response.score).toBe(80);
 
     now += 16_000;
     response = await engine.answerAttempt(started.attemptId, "A");
-    expect(response.score).toBe(24);
+    expect(response.score).toBe(120);
 
     now += 25_000;
     response = await engine.answerAttempt(started.attemptId, "A");
-    expect(response.score).toBe(28);
+    expect(response.score).toBe(152);
+
+    now += 55_000;
+    response = await engine.answerAttempt(started.attemptId, "A");
+    expect(response.score).toBe(168);
 
     now += 5_000;
     response = await engine.answerAttempt(started.attemptId, "B");
-    expect(response.score).toBe(28);
+    expect(response.score).toBe(168);
   });
 
   it("auto-submits on second tab switch", async () => {
@@ -286,5 +290,76 @@ describe("QuizEngine", () => {
     await engine.disqualifyAttempt(first.attemptId, "tester");
     const queueStatusAfter = await engine.getQueueStatus("two@example.com");
     expect(queueStatusAfter.canStart).toBe(true);
+  });
+
+  it("awards random power-ups at 5, 10, 15, 20 consecutive correct answers", async () => {
+    let now = 0;
+    const engine = new QuizEngine(
+      buildQuestionBank(),
+      new InMemoryAttemptStore(),
+      new InMemoryAuditStore(),
+      new InMemoryEventControlStore(),
+      { now: () => now, random: () => 0 }
+    );
+
+    const started = await engine.startAttempt("P", "power@example.com");
+    const expectedMilestones = [5, 10, 15, 20];
+    const expectedTypes = ["eliminate_two", "time_freeze", "double_score", "shield"] as const;
+    for (let i = 1; i <= 20; i += 1) {
+      now += 2_000;
+      const response = await engine.answerAttempt(started.attemptId, "A");
+      if (expectedMilestones.includes(i)) {
+        const milestoneIndex = expectedMilestones.indexOf(i);
+        expect(response.powerups?.awardedAtMilestones).toContain(i);
+        expect(response.powerups?.lastUnlockedStreak).toBe(i);
+        expect(response.powerups?.lastUnlockedPowerup).toBe(expectedTypes[milestoneIndex]);
+      }
+    }
+  });
+
+  it("does not repeat an awarded power-up type in a single attempt", async () => {
+    let now = 0;
+    const engine = new QuizEngine(
+      buildQuestionBank(),
+      new InMemoryAttemptStore(),
+      new InMemoryAuditStore(),
+      new InMemoryEventControlStore(),
+      { now: () => now, random: () => 0 }
+    );
+
+    const started = await engine.startAttempt("P", "norepeat@example.com");
+    for (let i = 0; i < 20; i += 1) {
+      now += 2_000;
+      await engine.answerAttempt(started.attemptId, "A");
+    }
+    const current = await engine.getCurrentQuestion(started.attemptId);
+    const awarded = current.powerups?.awardedTypes ?? [];
+    expect(awarded.length).toBe(4);
+    expect(new Set(awarded).size).toBe(4);
+  });
+
+  it("applies random awarded eliminate-two power-up to next question", async () => {
+    let now = 0;
+    const engine = new QuizEngine(
+      buildQuestionBank(),
+      new InMemoryAttemptStore(),
+      new InMemoryAuditStore(),
+      new InMemoryEventControlStore(),
+      { now: () => now, random: () => 0 }
+    );
+    const started = await engine.startAttempt("P", "double@example.com");
+    let response = await engine.getCurrentQuestion(started.attemptId);
+
+    for (let i = 0; i < 5; i += 1) {
+      now += 2_000;
+      response = await engine.answerAttempt(started.attemptId, "A");
+    }
+    expect(response.powerups?.lastUnlockedPowerup).toBe("eliminate_two");
+    const hidden = response.powerups?.eliminatedOptionsByQuestionId?.[response.question!.id] ?? [];
+    expect(hidden.length).toBe(2);
+    expect(new Set(hidden).size).toBe(2);
+    for (const option of hidden) {
+      expect(response.question?.options).toContain(option);
+    }
   });
 });

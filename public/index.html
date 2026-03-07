@@ -17,10 +17,12 @@
       <header class="hero animate-pop-in">
         <div class="organizers">
           <span class="org-text">Organized by</span>
-          <div class="org-logos">
+          <div class="org-iks-row">
+            <img src="/assets/iks-logo.png" alt="CISK Logo" class="org-logo iks-logo" />
+            <span class="org-iks-text">Centers for Indian Knowledge Systems</span>
+          </div>
+          <div class="org-sun-row">
             <img src="/assets/sun-logo.jpg" alt="Sandip University" class="org-logo sun-logo" />
-            <span class="org-divider">+</span>
-            <img src="/assets/iks-logo.png" alt="Indian Knowledge Systems" class="org-logo iks-logo" />
           </div>
         </div>
         <h1 class="title-3d">Vedic Maths<br><span class="highlight-text">Challenge</span></h1>
@@ -83,6 +85,11 @@
         
         <div class="progress-bar-container">
           <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+        </div>
+
+        <div id="powerup-popup" class="powerup-popup hidden">
+          <strong>Power-up Unlocked!</strong>
+          <span id="powerup-popup-text"></span>
         </div>
 
         <div id="question-animator" class="question-container">

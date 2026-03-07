@@ -3,6 +3,7 @@ import {
   DISCONNECT_GRACE_SECONDS,
   MAX_CONCURRENT_ATTEMPTS,
   MIN_POINTS_AFTER_20_SECONDS,
+  POWERUP_UNLOCK_STREAKS,
   QUESTIONS_PER_ATTEMPT,
   QUIZ_DURATION_SECONDS,
   SCORE_THRESHOLDS,
@@ -15,7 +16,9 @@ import {
   AuditEvent,
   AnswerResponse,
   Attempt,
+  AttemptPowerups,
   AttemptSummary,
+  PowerupType,
   PublicQuestion,
   Question,
   StartAttemptResponse
@@ -104,7 +107,8 @@ export class QuizEngine {
       lastSeenAt: now,
       score: 0,
       questions: selectedQuestions,
-      answers: []
+      answers: [],
+      powerups: this.createInitialPowerups()
     };
 
     await this.store.saveAttempt(attempt);
@@ -119,7 +123,8 @@ export class QuizEngine {
       question: this.toPublicQuestion(selectedQuestions[0]),
       totalQuestions: selectedQuestions.length,
       quizDurationSeconds: this.quizDurationSeconds,
-      deadlineAt: new Date(attempt.quizDeadlineAt).toISOString()
+      deadlineAt: new Date(attempt.quizDeadlineAt).toISOString(),
+      powerups: attempt.powerups
     };
   }
 
@@ -139,9 +144,28 @@ export class QuizEngine {
     }
 
     const question = attempt.questions[attempt.currentIndex];
-    const answeredInSeconds = Math.max(1, Math.ceil((now - attempt.currentQuestionShownAt) / 1000));
-    const isCorrect = selectedAnswer === question.correctAnswer;
-    const pointsAwarded = isCorrect ? this.pointsForTime(answeredInSeconds) : 0;
+    let frozenDurationMs = 0;
+    if (attempt.powerups.frozenQuestionId === question.id && attempt.powerups.frozenStartedAt) {
+      frozenDurationMs = Math.max(0, now - attempt.powerups.frozenStartedAt);
+      attempt.quizDeadlineAt += frozenDurationMs;
+    }
+
+    const answeredInSeconds = Math.max(
+      1,
+      Math.ceil((now - attempt.currentQuestionShownAt - frozenDurationMs) / 1000)
+    );
+    const rawIsCorrect = selectedAnswer === question.correctAnswer;
+    const shieldedWrong =
+      !rawIsCorrect && attempt.powerups.shieldArmedForQuestionId === question.id;
+
+    let pointsAwarded = rawIsCorrect ? this.pointsForTime(answeredInSeconds) : 0;
+    if (shieldedWrong) {
+      pointsAwarded = MIN_POINTS_AFTER_20_SECONDS;
+    }
+    if (rawIsCorrect && attempt.powerups.doubleQuestionId === question.id) {
+      pointsAwarded *= 2;
+    }
+    const isCorrect = rawIsCorrect || shieldedWrong;
 
     attempt.answers.push({
       questionId: question.id,
@@ -149,10 +173,17 @@ export class QuizEngine {
       isCorrect,
       answeredAt: new Date(now).toISOString(),
       answeredInSeconds,
-      pointsAwarded
+      pointsAwarded,
+      wasShielded: shieldedWrong
     });
 
     attempt.score += pointsAwarded;
+    if (isCorrect) {
+      attempt.powerups.consecutiveCorrect += 1;
+    } else {
+      attempt.powerups.consecutiveCorrect = 0;
+    }
+    this.clearPerQuestionPowerupState(attempt, question.id);
     attempt.currentIndex += 1;
     attempt.lastSeenAt = now;
 
@@ -171,6 +202,9 @@ export class QuizEngine {
     }
 
     attempt.currentQuestionShownAt = now;
+    if (isCorrect) {
+      this.awardRandomPowerupIfMilestone(attempt, now);
+    }
     await this.store.saveAttempt(attempt);
 
     return {
@@ -180,7 +214,8 @@ export class QuizEngine {
       progress: {
         answered: attempt.answers.length,
         total: attempt.questions.length
-      }
+      },
+      powerups: attempt.powerups
     };
   }
 
@@ -209,7 +244,8 @@ export class QuizEngine {
       progress: {
         answered: attempt.answers.length,
         total: attempt.questions.length
-      }
+      },
+      powerups: attempt.powerups
     };
   }
 
@@ -261,7 +297,8 @@ export class QuizEngine {
         answered: attempt.answers.length,
         total: attempt.questions.length
       },
-      reason: "tab_switch_warning"
+      reason: "tab_switch_warning",
+      powerups: attempt.powerups
     };
   }
 
@@ -453,6 +490,90 @@ export class QuizEngine {
     return unique;
   }
 
+  private createInitialPowerups(): AttemptPowerups {
+    return {
+      consecutiveCorrect: 0,
+      awardedAtMilestones: [],
+      awardedTypes: [],
+      eliminatedOptionsByQuestionId: {}
+    };
+  }
+
+  private ensureAttemptPowerups(attempt: Attempt): void {
+    if (!attempt.powerups) {
+      attempt.powerups = this.createInitialPowerups();
+      return;
+    }
+    attempt.powerups.awardedAtMilestones ??= [];
+    attempt.powerups.awardedTypes ??= [];
+    attempt.powerups.eliminatedOptionsByQuestionId ??= {};
+    attempt.powerups.consecutiveCorrect ??= 0;
+  }
+
+  private awardRandomPowerupIfMilestone(attempt: Attempt, now: number): void {
+    const streak = attempt.powerups.consecutiveCorrect;
+    const milestones: number[] = [
+      POWERUP_UNLOCK_STREAKS.eliminate_two,
+      POWERUP_UNLOCK_STREAKS.time_freeze,
+      POWERUP_UNLOCK_STREAKS.double_score,
+      POWERUP_UNLOCK_STREAKS.shield
+    ];
+    if (!milestones.includes(streak)) {
+      return;
+    }
+    if (attempt.powerups.awardedAtMilestones.includes(streak)) {
+      return;
+    }
+
+    attempt.powerups.awardedAtMilestones.push(streak);
+    const allTypes: PowerupType[] = ["eliminate_two", "time_freeze", "double_score", "shield"];
+    const availableTypes = allTypes.filter((type) => !attempt.powerups.awardedTypes.includes(type));
+    if (availableTypes.length === 0) {
+      return;
+    }
+    const type = availableTypes[Math.floor(this.random() * availableTypes.length)];
+    attempt.powerups.awardedTypes.push(type);
+    attempt.powerups.lastUnlockedPowerup = type;
+    attempt.powerups.lastUnlockedStreak = streak;
+
+    const nextQuestion = attempt.questions[attempt.currentIndex];
+    if (!nextQuestion) {
+      return;
+    }
+
+    if (type === "eliminate_two") {
+      const incorrect = nextQuestion.options.filter((opt) => opt !== nextQuestion.correctAnswer);
+      attempt.powerups.eliminatedOptionsByQuestionId[nextQuestion.id] = this.shuffle(incorrect).slice(0, 2);
+      return;
+    }
+    if (type === "time_freeze") {
+      attempt.powerups.frozenQuestionId = nextQuestion.id;
+      attempt.powerups.frozenStartedAt = now;
+      return;
+    }
+    if (type === "double_score") {
+      attempt.powerups.doubleQuestionId = nextQuestion.id;
+      return;
+    }
+    attempt.powerups.shieldArmedForQuestionId = nextQuestion.id;
+  }
+
+  private clearPerQuestionPowerupState(attempt: Attempt, questionId: string): void {
+    if (attempt.powerups.frozenQuestionId === questionId) {
+      attempt.powerups.frozenQuestionId = undefined;
+      attempt.powerups.frozenStartedAt = undefined;
+    }
+    if (attempt.powerups.doubleQuestionId === questionId) {
+      attempt.powerups.doubleQuestionId = undefined;
+    }
+    if (attempt.powerups.shieldArmedForQuestionId === questionId) {
+      attempt.powerups.shieldArmedForQuestionId = undefined;
+    }
+    if (attempt.powerups.eliminatedOptionsByQuestionId[questionId]) {
+      delete attempt.powerups.eliminatedOptionsByQuestionId[questionId];
+    }
+  }
+
   private pointsForTime(seconds: number): number {
     for (const threshold of SCORE_THRESHOLDS) {
       if (seconds <= threshold.maxSeconds) {
@@ -557,6 +678,7 @@ export class QuizEngine {
     if (!attempt) {
       throw new QuizRuleError("Attempt not found", 404);
     }
+    this.ensureAttemptPowerups(attempt);
     if (attempt.status !== "in_progress") {
       throw new QuizRuleError("Attempt is no longer active", 409);
     }
@@ -605,7 +727,8 @@ export class QuizEngine {
         total: attempt.questions.length
       },
       submittedAt: new Date(attempt.submittedAt ?? this.now()).toISOString(),
-      reason: attempt.voidReason ?? reason
+      reason: attempt.voidReason ?? reason,
+      powerups: attempt.powerups
     };
   }
 

@@ -22,6 +22,7 @@ export interface AttemptQuestion {
   answeredAt: string;
   answeredInSeconds: number;
   pointsAwarded: number;
+  wasShielded?: boolean;
 }
 
 export interface AttemptSummary {
@@ -33,6 +34,21 @@ export interface AttemptSummary {
 }
 
 export type AttemptStatus = "in_progress" | "submitted" | "void";
+
+export type PowerupType = "eliminate_two" | "time_freeze" | "double_score" | "shield";
+
+export interface AttemptPowerups {
+  consecutiveCorrect: number;
+  awardedAtMilestones: number[];
+  awardedTypes: PowerupType[];
+  lastUnlockedPowerup?: PowerupType;
+  lastUnlockedStreak?: number;
+  eliminatedOptionsByQuestionId: Record<string, string[]>;
+  frozenQuestionId?: string;
+  frozenStartedAt?: number;
+  doubleQuestionId?: string;
+  shieldArmedForQuestionId?: string;
+}
 
 export interface Attempt {
   id: string;
@@ -56,6 +72,7 @@ export interface Attempt {
   isDisqualified?: boolean;
   disqualifiedAt?: number;
   disqualifiedBy?: string;
+  powerups: AttemptPowerups;
 }
 
 export type AuditEventType =
@@ -82,6 +99,7 @@ export interface StartAttemptResponse {
   totalQuestions: number;
   quizDurationSeconds: number;
   deadlineAt: string;
+  powerups: AttemptPowerups;
 }
 
 export interface AnswerResponse {
@@ -94,4 +112,5 @@ export interface AnswerResponse {
   };
   submittedAt?: string;
   reason?: string;
+  powerups?: AttemptPowerups;
 }
