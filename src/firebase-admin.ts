@@ -1,11 +1,14 @@
 import fs from "node:fs";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 interface ServiceAccountFile {
   project_id: string;
   client_email: string;
   private_key: string;
 }
+
+let firestoreConfigured = false;
 
 function credentialsFromEnv() {
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -48,19 +51,22 @@ function credentialsFromFile() {
 }
 
 export function initFirebaseApp(): void {
-  if (getApps().length > 0) {
-    return;
+  if (getApps().length === 0) {
+    const credentials = credentialsFromEnv() ?? credentialsFromFile();
+
+    if (!credentials) {
+      throw new Error(
+        "Missing Firebase credentials. Provide FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY or set FIREBASE_SERVICE_ACCOUNT_PATH/GOOGLE_APPLICATION_CREDENTIALS."
+      );
+    }
+
+    initializeApp({
+      credential: cert(credentials)
+    });
   }
 
-  const credentials = credentialsFromEnv() ?? credentialsFromFile();
-
-  if (!credentials) {
-    throw new Error(
-      "Missing Firebase credentials. Provide FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY or set FIREBASE_SERVICE_ACCOUNT_PATH/GOOGLE_APPLICATION_CREDENTIALS."
-    );
+  if (!firestoreConfigured) {
+    getFirestore().settings({ ignoreUndefinedProperties: true });
+    firestoreConfigured = true;
   }
-
-  initializeApp({
-    credential: cert(credentials)
-  });
 }
