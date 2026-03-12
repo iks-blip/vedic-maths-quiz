@@ -5,7 +5,6 @@ import { z } from "zod";
 import { QuizEngine, QuizRuleError } from "./quiz-engine.js";
 import type { Attempt } from "./types.js";
 import { renderCertificateHtml } from "./certificate.js";
-import { sendCertificateEmail } from "./certificate-mailer.js";
 
 interface AppOptions {
   adminToken: string;
@@ -196,26 +195,10 @@ export function createApp(engine: QuizEngine, options: AppOptions) {
         issuedAt: certificate.issuedAt
       });
 
-      const mailResult = await sendCertificateEmail({
-        to: attempt.email,
-        name: attempt.name,
-        certificateType: certificate.type,
-        score: attempt.score,
-        certificateId: certificate.certificateId,
-        certificateHtml: previewHtml
-      });
-
-      const updatedCertificate = await engine.setCertificateDelivery(
-        req.params.attemptId,
-        mailResult.status === "sent" ? "sent" : "failed",
-        mailResult.error
-      );
-
       res.status(201).json({
-        certificate: updatedCertificate,
+        certificate,
         previewHtml,
-        emailStatus: mailResult.status,
-        emailError: mailResult.error
+        emailStatus: "ready_for_email"
       });
     } catch (error) {
       next(error);
@@ -316,26 +299,11 @@ export function createApp(engine: QuizEngine, options: AppOptions) {
         issuedAt: certificate.issuedAt
       });
 
-      const mailResult = await sendCertificateEmail({
-        to: attempt.email,
-        name: attempt.name,
-        certificateType: certificate.type,
-        score: attempt.score,
-        certificateId: certificate.certificateId,
-        certificateHtml: previewHtml
-      });
-
-      const updatedCertificate = await engine.setCertificateDelivery(
-        attemptId,
-        mailResult.status === "sent" ? "sent" : "failed",
-        mailResult.error
-      );
-
       res.json({
         ok: true,
-        certificate: updatedCertificate,
-        emailStatus: mailResult.status,
-        emailError: mailResult.error
+        certificate,
+        previewHtml,
+        emailStatus: "ready_for_email"
       });
     } catch (error) {
       next(error);
@@ -361,6 +329,7 @@ export function createApp(engine: QuizEngine, options: AppOptions) {
       "certificate_id",
       "certificate_status",
       "certificate_error",
+      "certificate_issued_at",
       "certificate_sent_at"
     ].join(",");
     const rows = submissions
@@ -377,6 +346,7 @@ export function createApp(engine: QuizEngine, options: AppOptions) {
           toCsv(item.certificate?.certificateId ?? ""),
           toCsv(item.certificate?.deliveryStatus ?? ""),
           toCsv(item.certificate?.deliveryError ?? ""),
+          toCsv(item.certificate?.issuedAt ?? ""),
           toCsv(item.certificate?.deliverySentAt ?? "")
         ].join(",")
       )

@@ -186,7 +186,7 @@ function finalizeQuiz(finalScore, reason) {
     certificateSection.classList.remove("hidden");
   }
   if (certificateStatusEl) {
-    certificateStatusEl.textContent = "Choose one certificate type. Preview will open and email will be sent.";
+    certificateStatusEl.textContent = "Choose one certificate type. Preview will open and the certificate will be recorded for later email.";
   }
   if (certificatePreviewEl) {
     certificatePreviewEl.classList.add("hidden");
@@ -226,7 +226,7 @@ async function issueCertificate(type) {
   }
   setCertificateButtonsDisabled(true);
   if (certificateStatusEl) {
-    certificateStatusEl.textContent = "Generating preview and sending email...";
+    certificateStatusEl.textContent = "Generating preview and recording certificate...";
   }
 
   try {
@@ -250,10 +250,7 @@ async function issueCertificate(type) {
       certificatePreviewEl.innerHTML = `<iframe title="Certificate Preview" style="width:100%;min-height:360px;border:0;" srcdoc='${String(response.previewHtml).replace(/'/g, "&#39;")}'></iframe>`;
     }
     if (certificateStatusEl) {
-      certificateStatusEl.textContent =
-        response.emailStatus === "sent"
-          ? "Certificate emailed successfully."
-          : `Certificate generated, but email failed (${response.emailError || "unknown"}). Admin can track this in CSV.`;
+      certificateStatusEl.textContent = "Certificate generated successfully. It has been recorded in the CSV for later email.";
     }
   } catch (error) {
     if (certificateStatusEl) {

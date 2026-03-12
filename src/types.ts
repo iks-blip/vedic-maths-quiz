@@ -37,7 +37,7 @@ export type AttemptStatus = "in_progress" | "submitted" | "void";
 
 export type PowerupType = "eliminate_two" | "time_freeze" | "double_score" | "shield";
 export type CertificateType = "participation" | "score";
-export type CertificateDeliveryStatus = "pending" | "sent" | "failed";
+export type CertificateDeliveryStatus = "ready_for_email";
 
 export interface AttemptCertificate {
   certificateId: string;

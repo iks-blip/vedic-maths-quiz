@@ -452,7 +452,7 @@ export class QuizEngine {
       certificateId: uuidv4(),
       type,
       issuedAt: new Date(this.now()).toISOString(),
-      deliveryStatus: "pending"
+      deliveryStatus: "ready_for_email"
     };
     attempt.certificate = certificate;
     await this.store.saveAttempt(attempt);
@@ -474,12 +474,7 @@ export class QuizEngine {
 
     attempt.certificate.deliveryStatus = status;
     attempt.certificate.deliveryLastAttemptAt = new Date(this.now()).toISOString();
-    if (status === "sent") {
-      attempt.certificate.deliverySentAt = attempt.certificate.deliveryLastAttemptAt;
-      attempt.certificate.deliveryError = undefined;
-    } else if (status === "failed") {
-      attempt.certificate.deliveryError = errorMessage ?? "email_send_failed";
-    }
+    attempt.certificate.deliveryError = errorMessage;
     await this.store.saveAttempt(attempt);
     return attempt.certificate;
   }

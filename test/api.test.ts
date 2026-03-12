@@ -200,7 +200,8 @@ describe("API", () => {
 
     expect(issueRes.body.certificate.type).toBe("participation");
     expect(issueRes.body.previewHtml).toContain("Participation Certificate");
-    expect(["sent", "failed"]).toContain(issueRes.body.emailStatus);
+    expect(issueRes.body.emailStatus).toBe("ready_for_email");
+    expect(issueRes.body.certificate.deliveryStatus).toBe("ready_for_email");
 
     await request(app)
       .post(`/api/attempts/${started.body.attemptId}/certificate`)

@@ -106,13 +106,7 @@ function certificateStatusBadge(item) {
   if (!status) {
     return "";
   }
-  const cls =
-    status === "sent"
-      ? "cert-status-sent"
-      : status === "failed"
-        ? "cert-status-failed"
-        : "cert-status-pending";
-  return `<span class="status-badge ${cls}">${escapeHtml(status)}</span>`;
+  return `<span class="status-badge cert-status-pending">${escapeHtml(status)}</span>`;
 }
 
 function certificateLastResult(item) {
@@ -120,14 +114,7 @@ function certificateLastResult(item) {
   if (!cert?.certificateId) {
     return "-";
   }
-  if (cert.deliveryStatus === "sent") {
-    return `<span class="success-text">Sent</span> ${formatTimestamp(cert.deliverySentAt || cert.deliveryLastAttemptAt || cert.issuedAt)}`;
-  }
-  if (cert.deliveryStatus === "failed") {
-    const err = cert.deliveryError ? ` (${escapeHtml(cert.deliveryError)})` : "";
-    return `<span class="void-status">Failed</span> ${formatTimestamp(cert.deliveryLastAttemptAt || cert.issuedAt)}${err}`;
-  }
-  return `<span class="status-badge cert-status-pending">Pending</span> ${formatTimestamp(cert.deliveryLastAttemptAt || cert.issuedAt)}`;
+  return `<span class="status-badge cert-status-pending">Ready for email</span> ${formatTimestamp(cert.issuedAt)}`;
 }
 
 function applySubmissionFilter(items) {
@@ -138,7 +125,7 @@ function applySubmissionFilter(items) {
   if (filter === "none") {
     return items.filter((item) => !item.certificate?.certificateId);
   }
-  return items.filter((item) => item.certificate?.deliveryStatus === filter);
+  return items.filter((item) => item.certificate?.deliveryStatus === "ready_for_email");
 }
 
 function renderSubmissionsRows(items) {
@@ -149,7 +136,7 @@ function renderSubmissionsRows(items) {
     submissionsBody,
     filtered.map(
       (item) => {
-        const certButtonLabel = item.certificate?.certificateId ? "Resend Certificate" : "Send Certificate";
+        const certButtonLabel = item.certificate?.certificateId ? "View Certificate" : "Generate Certificate";
         const certStatus = certificateStatusBadge(item);
         const disqualifyAction = item.isDisqualified
           ? '<span class="void-status">Disqualified</span>'
@@ -246,33 +233,14 @@ certificateFilter?.addEventListener("change", () => {
 });
 
 resendFailedBtn?.addEventListener("click", async () => {
-  const failed = submissionsCache.filter((item) => item.certificate?.deliveryStatus === "failed");
-  if (failed.length === 0) {
-    authMsg.textContent = "No failed certificates to resend.";
+  const pendingMail = submissionsCache.filter((item) => item.certificate?.deliveryStatus === "ready_for_email");
+  if (pendingMail.length === 0) {
+    authMsg.textContent = "No certificates are pending later email.";
     authMsg.style.color = "var(--text-muted)";
     return;
   }
-  resendFailedBtn.disabled = true;
-  authMsg.textContent = `Resending ${failed.length} failed certificates...`;
-  authMsg.style.color = "var(--primary)";
-  let success = 0;
-  let failure = 0;
-  for (const item of failed) {
-    try {
-      await adminApi(`/api/admin/attempts/${item.id}/send-certificate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({})
-      });
-      success += 1;
-    } catch {
-      failure += 1;
-    }
-  }
-  resendFailedBtn.disabled = false;
-  await loadDashboard();
-  authMsg.textContent = `Resend complete. Success: ${success}, Failed: ${failure}`;
-  authMsg.style.color = failure > 0 ? "var(--danger)" : "var(--success)";
+  authMsg.textContent = `${pendingMail.length} certificate(s) are marked ready for later email in the CSV export.`;
+  authMsg.style.color = "var(--success)";
 });
 
 exportCsvBtn.addEventListener("click", async () => {

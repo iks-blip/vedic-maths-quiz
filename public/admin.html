@@ -120,12 +120,10 @@
               <select id="certificate-filter" class="brutal-input" style="max-width:220px; padding:10px 12px;">
                 <option value="all">All Certificates</option>
                 <option value="none">No Certificate</option>
-                <option value="pending">Pending</option>
-                <option value="sent">Sent</option>
-                <option value="failed">Failed</option>
+                <option value="ready">Ready For Email</option>
               </select>
               <button id="resend-failed" type="button" class="brutal-btn bg-primary text-white" style="font-size: 0.9rem; padding: 10px 16px;">
-                Resend Failed
+                Pending Email Summary
               </button>
               <span class="count-badge" id="submissions-count">0 Items</span>
             </div>
@@ -140,7 +138,7 @@
                   <th align="right">Score</th>
                   <th>Status/Reason</th>
                   <th>Flags</th>
-                  <th>Last Certificate Result</th>
+                  <th>Certificate Status</th>
                   <th>Action</th>
                 </tr>
               </thead>

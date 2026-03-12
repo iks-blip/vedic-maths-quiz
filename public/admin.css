@@ -154,16 +154,6 @@
   border: 2px solid var(--border);
 }
 
-.cert-status-sent {
-  background: var(--green);
-  color: #fff;
-}
-
-.cert-status-failed {
-  background: var(--primary);
-  color: #fff;
-}
-
 .cert-status-pending {
   background: var(--secondary);
   color: #fff;
