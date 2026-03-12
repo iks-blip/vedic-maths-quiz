@@ -16,6 +16,8 @@ let cachedParticipationTemplate = "";
 let cachedScoreTemplate = "";
 let cachedSunLogoDataUri = "";
 let cachedIksLogoDataUri = "";
+let cachedShaileeSignatureDataUri = "";
+let cachedShindeSignatureDataUri = "";
 let cacheInitialized = false;
 let cacheStamp = "";
 
@@ -36,7 +38,9 @@ function getTemplateStamp(): string {
     path.resolve(process.cwd(), "public", "certificates", "participation.html"),
     path.resolve(process.cwd(), "public", "certificates", "score.html"),
     path.resolve(process.cwd(), "public", "assets", "sun-logo.jpg"),
-    path.resolve(process.cwd(), "public", "assets", "iks-logo.png")
+    path.resolve(process.cwd(), "public", "assets", "iks-logo.png"),
+    path.resolve(process.cwd(), "public", "assets", "sig-shailee.png"),
+    path.resolve(process.cwd(), "public", "assets", "sig-shinde.png")
   ];
   return files.map((f) => `${f}:${fs.statSync(f).mtimeMs}`).join("|");
 }
@@ -51,6 +55,8 @@ function ensureTemplateCache(): void {
   cachedScoreTemplate = readPublicFile(path.join("certificates", "score.html"));
   cachedSunLogoDataUri = readLogoDataUri(path.join("assets", "sun-logo.jpg"), "image/jpeg");
   cachedIksLogoDataUri = readLogoDataUri(path.join("assets", "iks-logo.png"), "image/png");
+  cachedShaileeSignatureDataUri = readLogoDataUri(path.join("assets", "sig-shailee.png"), "image/png");
+  cachedShindeSignatureDataUri = readLogoDataUri(path.join("assets", "sig-shinde.png"), "image/png");
   cacheInitialized = true;
   cacheStamp = nextStamp;
 }
@@ -73,7 +79,9 @@ export function renderCertificateHtml(params: {
   const htmlWithInlinedAssets = template
     .replace('<link rel="stylesheet" href="certificate.css">', `<style>${cachedCss}</style>`)
     .replaceAll("../assets/sun-logo.jpg", cachedSunLogoDataUri)
-    .replaceAll("../assets/iks-logo.png", cachedIksLogoDataUri);
+    .replaceAll("../assets/iks-logo.png", cachedIksLogoDataUri)
+    .replaceAll("../assets/sig-shailee.png", cachedShaileeSignatureDataUri)
+    .replaceAll("../assets/sig-shinde.png", cachedShindeSignatureDataUri);
 
   return htmlWithInlinedAssets
     .replaceAll("{{name}}", safe(params.attempt.name))
