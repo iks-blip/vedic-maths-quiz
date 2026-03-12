@@ -15,8 +15,9 @@ export async function generateCertificatePdf(html: string): Promise<CertificateP
     });
     try {
       const page = await browser.newPage();
+      page.setDefaultNavigationTimeout(15_000);
       await page.setViewport({ width: initialWidthPx, height: initialHeightPx, deviceScaleFactor: 2 });
-      await page.setContent(html, { waitUntil: "networkidle0" });
+      await page.setContent(html, { waitUntil: "domcontentloaded" });
       await page.waitForSelector(".certificate-canvas");
 
       const canvasEl = await page.$(".certificate-canvas");
@@ -34,6 +35,7 @@ export async function generateCertificatePdf(html: string): Promise<CertificateP
       const pageHeightPx = Math.ceil(box.height);
 
       const pdfPage = await browser.newPage();
+      pdfPage.setDefaultNavigationTimeout(15_000);
       await pdfPage.setViewport({ width: pageWidthPx, height: pageHeightPx, deviceScaleFactor: 2 });
       await pdfPage.setContent(
         `<!doctype html>
@@ -50,7 +52,7 @@ export async function generateCertificatePdf(html: string): Promise<CertificateP
   <img alt="certificate" src="data:image/png;base64,${pngBase64}" />
 </body>
 </html>`,
-        { waitUntil: "networkidle0" }
+        { waitUntil: "domcontentloaded" }
       );
 
       const pdfBuffer = await pdfPage.pdf({
