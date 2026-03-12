@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "dev:firebase": "USE_FIREBASE=1 tsx watch src/server.ts",
+    "postinstall": "puppeteer browsers install chrome",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
     "test": "vitest run",
