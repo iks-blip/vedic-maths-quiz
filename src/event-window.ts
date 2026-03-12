@@ -19,13 +19,13 @@ function formatIst(epochMs: number): string {
 }
 
 export function getEventWindowMs(): { startAtMs: number; endAtMs: number } {
-  const startIso = process.env.EVENT_START_AT_IST ?? "2026-03-14T00:00:00+05:30";
-  const endIso = process.env.EVENT_END_AT_IST ?? "2026-03-14T12:00:00+05:30";
+  const startIso = process.env.EVENT_START_AT_IST;
+  const endIso = process.env.EVENT_END_AT_IST;
 
-  const startAtMs = parseIsoWithOffsetToEpochMs(startIso);
-  const endAtMs = parseIsoWithOffsetToEpochMs(endIso);
+  const startAtMs = startIso ? parseIsoWithOffsetToEpochMs(startIso) : Number.NEGATIVE_INFINITY;
+  const endAtMs = endIso ? parseIsoWithOffsetToEpochMs(endIso) : Number.POSITIVE_INFINITY;
 
-  if (endAtMs <= startAtMs) {
+  if (Number.isFinite(startAtMs) && Number.isFinite(endAtMs) && endAtMs <= startAtMs) {
     throw new Error("Event end must be after event start");
   }
 
@@ -33,5 +33,7 @@ export function getEventWindowMs(): { startAtMs: number; endAtMs: number } {
 }
 
 export function eventWindowMessage(startAtMs: number, endAtMs: number): string {
-  return `Event window is ${formatIst(startAtMs)} to ${formatIst(endAtMs)}.`;
+  const start = Number.isFinite(startAtMs) ? formatIst(startAtMs) : "unbounded start";
+  const end = Number.isFinite(endAtMs) ? formatIst(endAtMs) : "unbounded end";
+  return `Event window is ${start} to ${end}.`;
 }

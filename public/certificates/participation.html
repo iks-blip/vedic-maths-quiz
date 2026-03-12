@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Participation Certificate</title>
+  <link rel="stylesheet" href="certificate.css">
+</head>
+<body>
+
+  <div class="certificate-canvas">
+    <div class="certificate-inner">
+      <!-- Decorative Corners -->
+      <div class="corner corner-tl"></div>
+      <div class="corner corner-tr"></div>
+      <div class="corner corner-bl"></div>
+      <div class="corner corner-br"></div>
+
+      <!-- Header -->
+      <header class="cert-header">
+        <span class="org-text">Organized by</span>
+        <div class="org-iks-row">
+          <img src="../assets/iks-logo.png" alt="CISK Logo" class="org-logo iks-logo" />
+          <span class="org-iks-text">Centers for Indian Knowledge Systems</span>
+        </div>
+        <div class="org-sun-row">
+          <img src="../assets/sun-logo.jpg" alt="Sandip University" class="org-logo sun-logo" />
+        </div>
+      </header>
+
+      <!-- Body -->
+      <main class="cert-body">
+        <h1 class="cert-title">Certificate of<br>Participation</h1>
+        
+        <p class="text-line">This is to proudly certify that</p>
+        
+        <div class="name-box">
+          <div class="name-text">{{name}}</div>
+        </div>
+
+        <p class="achievement-text">
+          Has boldly stepped into the arena and successfully completed the <strong>Vedic Maths Challenge</strong>. We commend your enthusiasm, mental agility, and dedication to the ancient knowledge systems.
+        </p>
+      </main>
+
+      <!-- Footer -->
+      <footer class="cert-footer">
+        <div class="meta-box">
+          <span class="meta-label">Certificate ID</span>
+          <span>{{certificateId}}</span>
+        </div>
+
+        <div class="signatures-container">
+          <div class="signature-box">
+            <img src="../assets/sig-shailee.png" alt="Signature" class="signature-img" />
+            <div class="signature-line"></div>
+            <span class="signature-text">Ms. Shailee Pandya</span>
+            <span class="signature-title">Coordinator, Center for IKS</span>
+          </div>
+
+          <div class="signature-box">
+            <img src="../assets/sig-shinde.png" alt="Signature" class="signature-img" />
+            <div class="signature-line"></div>
+            <span class="signature-text">Dr. Dhyandeo D. Shinde</span>
+            <span class="signature-title">Dean Academics, Sandip University</span>
+          </div>
+        </div>
+
+        <div class="meta-box">
+          <span class="meta-label">Issued Date</span>
+          <span>{{issuedDate}}</span>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+</body>
+</html>

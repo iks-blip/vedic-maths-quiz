@@ -32,8 +32,8 @@ Optional:
 - Prefer keeping service account JSON outside this repository.
 
 ## Event Window (Nashik / IST)
-- Default enforced window: `2026-03-14 00:00 IST` to `2026-03-14 12:00 IST`
-- Override if needed:
+- No default date lock is enforced now.
+- Set these only at real launch time:
 ```bash
 export EVENT_START_AT_IST="2026-03-14T00:00:00+05:30"
 export EVENT_END_AT_IST="2026-03-14T12:00:00+05:30"
@@ -47,6 +47,20 @@ export ADMIN_TOKEN="replace-with-strong-token"
 ```
 - Admin APIs require `Authorization: Bearer <token>`.
 - Includes leaderboard view, submissions view, audit logs, disqualify action, and CSV export.
+
+## SMTP for Certificates
+Certificate emails require SMTP env vars:
+```bash
+export SMTP_HOST="smtp.your-provider.com"
+export SMTP_PORT="587"
+export SMTP_USER="your-smtp-username"
+export SMTP_PASS="your-smtp-password"
+export SMTP_FROM="Vedic Maths Quiz <no-reply@your-domain.com>"
+```
+
+If SMTP is missing/invalid:
+- Certificate preview still works.
+- Email status is saved as `failed` and visible in admin CSV (`certificate_status`, `certificate_error`).
 
 ## Anti-Cheat Controls
 - IP-based request throttling on `/api/attempts/*` and `/api/admin/*`.

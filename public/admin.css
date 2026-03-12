@@ -40,6 +40,22 @@
   width: 100vw;
 }
 
+.auth-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 120;
+  background: var(--green);
+  color: #fff;
+  border: 3px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  box-shadow: 6px 6px 0 var(--shadow-color);
+}
+
 /* Brutal Sidebar */
 .brutal-sidebar {
   width: 280px;
@@ -138,6 +154,21 @@
   border: 2px solid var(--border);
 }
 
+.cert-status-sent {
+  background: var(--green);
+  color: #fff;
+}
+
+.cert-status-failed {
+  background: var(--primary);
+  color: #fff;
+}
+
+.cert-status-pending {
+  background: var(--secondary);
+  color: #fff;
+}
+
 .header-actions {
   display: flex;
   gap: 12px;
@@ -203,6 +234,26 @@ code.small {
   border-radius: 6px;
   color: var(--text);
   font-weight: 700;
+}
+
+.brutal-btn-sm {
+  width: auto;
+  display: inline-flex;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  box-shadow: 3px 3px 0px var(--shadow-color);
+  border-width: 2px;
+}
+
+.brutal-btn-sm:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px var(--shadow-color);
+}
+
+.brutal-btn-sm:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px var(--shadow-color);
 }
 
 .void-status {

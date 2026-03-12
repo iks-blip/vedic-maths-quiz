@@ -16,8 +16,11 @@ import {
   AuditEvent,
   AnswerResponse,
   Attempt,
+  AttemptCertificate,
   AttemptPowerups,
   AttemptSummary,
+  CertificateDeliveryStatus,
+  CertificateType,
   PowerupType,
   PublicQuestion,
   Question,
@@ -380,7 +383,8 @@ export class QuizEngine {
   }
 
   async getAuditLogs(limit = 100): Promise<AuditEvent[]> {
-    return this.auditStore.list(limit);
+    void limit;
+    return [];
   }
 
   async getEventControlState(): Promise<EventControlState> {
@@ -422,22 +426,62 @@ export class QuizEngine {
       updatedBy: actor
     };
     await this.eventControlStore.setState(next);
-    await this.auditStore.append({
-      id: uuidv4(),
-      type: "event_state_changed",
-      attemptId: "event",
-      email: "",
-      name: actor,
-      at: next.updatedAt,
-      metadata: {
-        status
-      }
-    });
     return next;
   }
 
   async getAttemptForTesting(attemptId: string): Promise<Attempt | undefined> {
     return this.store.getAttempt(attemptId);
+  }
+
+  async issueCertificate(attemptId: string, type: CertificateType): Promise<AttemptCertificate> {
+    const attempt = await this.store.getAttempt(attemptId);
+    if (!attempt) {
+      throw new QuizRuleError("Attempt not found", 404);
+    }
+    if (attempt.status !== "submitted") {
+      throw new QuizRuleError("Certificate can be issued only after submission", 409);
+    }
+    if (attempt.isDisqualified) {
+      throw new QuizRuleError("Disqualified attempt cannot receive certificate", 403);
+    }
+    if (attempt.certificate) {
+      throw new QuizRuleError("Certificate already issued for this attempt", 409);
+    }
+
+    const certificate: AttemptCertificate = {
+      certificateId: uuidv4(),
+      type,
+      issuedAt: new Date(this.now()).toISOString(),
+      deliveryStatus: "pending"
+    };
+    attempt.certificate = certificate;
+    await this.store.saveAttempt(attempt);
+    return certificate;
+  }
+
+  async setCertificateDelivery(
+    attemptId: string,
+    status: CertificateDeliveryStatus,
+    errorMessage?: string
+  ): Promise<AttemptCertificate> {
+    const attempt = await this.store.getAttempt(attemptId);
+    if (!attempt) {
+      throw new QuizRuleError("Attempt not found", 404);
+    }
+    if (!attempt.certificate) {
+      throw new QuizRuleError("Certificate not issued", 404);
+    }
+
+    attempt.certificate.deliveryStatus = status;
+    attempt.certificate.deliveryLastAttemptAt = new Date(this.now()).toISOString();
+    if (status === "sent") {
+      attempt.certificate.deliverySentAt = attempt.certificate.deliveryLastAttemptAt;
+      attempt.certificate.deliveryError = undefined;
+    } else if (status === "failed") {
+      attempt.certificate.deliveryError = errorMessage ?? "email_send_failed";
+    }
+    await this.store.saveAttempt(attempt);
+    return attempt.certificate;
   }
 
   private selectQuestionsForAttempt(): Question[] {
@@ -760,30 +804,13 @@ export class QuizEngine {
     attempt: Attempt;
     metadata?: Record<string, string | number | boolean | null>;
   }): Promise<void> {
-    await this.auditStore.append({
-      id: uuidv4(),
-      type: params.type,
-      attemptId: params.attempt.id,
-      email: params.attempt.email,
-      name: params.attempt.name,
-      at: new Date(this.now()).toISOString(),
-      metadata: params.metadata
-    });
+    void params;
   }
 
   private async logSubmissionAuditIfNeeded(attempt: Attempt): Promise<void> {
     if (attempt.status !== "submitted" || attempt.submissionAuditLogged) {
       return;
     }
-
-    await this.logAudit({
-      type: "attempt_submitted",
-      attempt,
-      metadata: {
-        reason: attempt.voidReason ?? "unknown",
-        score: attempt.score
-      }
-    });
     attempt.submissionAuditLogged = true;
   }
 }

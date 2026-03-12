@@ -78,7 +78,7 @@ function parseLegacyQuestionBank(raw: string): Question[] {
 
 function parseSectionedQuestionBank(raw: string): Question[] {
   const sections: Array<{ difficulty: Difficulty; body: string }> = [];
-  const sectionRegex = /##\s*(Easy|Medium|Hard)\s*\(\d+\s*Questions\)\s*([\s\S]*?)(?=\n##\s*(Easy|Medium|Hard)\s*\(|$)/g;
+  const sectionRegex = /##\s*(Easy|Medium|Hard)\s*\(\d+(?:\s*Questions)?\)(?:\s*---[^\n]*)?\s*([\s\S]*?)(?=\n##\s*(Easy|Medium|Hard)\s*\(|$)/gi;
 
   let sectionMatch = sectionRegex.exec(raw);
   while (sectionMatch) {
@@ -94,16 +94,20 @@ function parseSectionedQuestionBank(raw: string): Question[] {
   const questions: Question[] = [];
 
   for (const section of sections) {
-    const questionRegex = /\*\*Q(\d+)\.\s*([\s\S]*?)\*\*\s*([\s\S]*?)\*\*Answer:\*\*\s*([A-D])/g;
-    let match = questionRegex.exec(section.body);
+    const blocks = section.body
+      .split(/###\s*Q(\d+)\s*/g)
+      .slice(1);
 
-    while (match) {
-      const number = Number(match[1]);
-      const text = match[2].trim();
-      const questionBody = match[3];
-      const answerLetter = match[4];
+    for (let i = 0; i < blocks.length; i += 2) {
+      const number = Number(blocks[i]);
+      const blockBody = blocks[i + 1] ?? "";
+      const textMatch = blockBody.match(/\*\*(?!Answer:)([\s\S]*?)\*\*/i);
+      const text = textMatch?.[1]?.trim();
+      if (!text) {
+        throw new Error(`Unable to parse question text for Q${number}`);
+      }
 
-      const optionLines = questionBody
+      const optionLines = blockBody
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => /^[A-D]\)/.test(line));
@@ -112,8 +116,17 @@ function parseSectionedQuestionBank(raw: string): Question[] {
         throw new Error(`Expected 4 options, found ${optionLines.length} for Q${number}`);
       }
 
+      const answerMatch = blockBody.match(/\*\*Answer:\*\*\s*([A-D])/i);
+      const answerLetter = answerMatch?.[1];
+      if (!answerLetter) {
+        throw new Error(`Missing answer marker for Q${number}`);
+      }
+
       const options = optionLines.map(extractOptionText);
       const correctIndex = ["A", "B", "C", "D"].indexOf(answerLetter);
+      if (correctIndex < 0) {
+        throw new Error(`Invalid answer marker '${answerLetter}' for Q${number}`);
+      }
 
       questions.push({
         id: `q-${number}`,
@@ -122,8 +135,6 @@ function parseSectionedQuestionBank(raw: string): Question[] {
         correctAnswer: options[correctIndex],
         difficulty: section.difficulty
       });
-
-      match = questionRegex.exec(section.body);
     }
   }
 
@@ -140,14 +151,14 @@ function parseSectionedQuestionBank(raw: string): Question[] {
 }
 
 export function loadQuestionBank(markdownPath?: string): Question[] {
-  const defaultNewBank = path.resolve(process.cwd(), "vedic-maths-100-20easy-30med-50hard.md");
+  const defaultNewBank = path.resolve(process.cwd(), "vedic-maths-vedic-tricks-100q.md");
   const defaultLegacyBank = path.resolve(process.cwd(), "vedic-maths-question-bank-75.md");
 
   const resolvedPath =
     markdownPath ?? (fs.existsSync(defaultNewBank) ? defaultNewBank : defaultLegacyBank);
   const raw = fs.readFileSync(resolvedPath, "utf8");
 
-  if (/##\s*Easy\s*\(\d+\s*Questions\)/i.test(raw) && /\*\*Q\d+\./.test(raw)) {
+  if (/##\s*(Easy|Medium|Hard)\s*\(\d+/i.test(raw) && /###\s*Q\d+/i.test(raw)) {
     return parseSectionedQuestionBank(raw);
   }
 

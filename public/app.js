@@ -12,7 +12,8 @@ const state = {
   queuedName: null,
   queuedEmail: null,
   queueInterval: null,
-  lastPowerupMarker: null
+  lastPowerupMarker: null,
+  certificateIssued: false
 };
 
 const startCard = document.getElementById("start-card");
@@ -25,6 +26,11 @@ const quizCard = document.getElementById("quiz-card");
 const resultCard = document.getElementById("result-card");
 const resultText = document.getElementById("result-text");
 const resultScoreEl = document.getElementById("result-score");
+const certificateSection = document.getElementById("certificate-section");
+const certificateParticipationBtn = document.getElementById("certificate-participation-btn");
+const certificateScoreBtn = document.getElementById("certificate-score-btn");
+const certificateStatusEl = document.getElementById("certificate-status");
+const certificatePreviewEl = document.getElementById("certificate-preview");
 const progressEl = document.getElementById("progress");
 const progressBar = document.getElementById("progress-bar");
 const scoreEl = document.getElementById("score");
@@ -158,6 +164,41 @@ function finalizeQuiz(finalScore, reason) {
   resultScoreEl.textContent = finalScore;
   resultText.textContent = reason ? `Reason: ${reason}` : "Your attempt has been recorded.";
   
+  if (window.confetti) {
+    const duration = 3 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+
+    const interval = setInterval(function() {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+      window.confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random(), y: Math.random() - 0.2 } }));
+    }, 250);
+  }
+
+  state.certificateIssued = false;
+  if (certificateSection) {
+    certificateSection.classList.remove("hidden");
+  }
+  if (certificateStatusEl) {
+    certificateStatusEl.textContent = "Choose one certificate type. Preview will open and email will be sent.";
+  }
+  if (certificatePreviewEl) {
+    certificatePreviewEl.classList.add("hidden");
+    certificatePreviewEl.innerHTML = "";
+  }
+  if (certificateParticipationBtn) {
+    certificateParticipationBtn.disabled = false;
+  }
+  if (certificateScoreBtn) {
+    certificateScoreBtn.disabled = false;
+  }
+  
   if (state.timerInterval) {
     clearInterval(state.timerInterval);
   }
@@ -168,6 +209,58 @@ function finalizeQuiz(finalScore, reason) {
     clearInterval(state.queueInterval);
   }
   loadLeaderboard();
+}
+
+function setCertificateButtonsDisabled(disabled) {
+  if (certificateParticipationBtn) {
+    certificateParticipationBtn.disabled = disabled;
+  }
+  if (certificateScoreBtn) {
+    certificateScoreBtn.disabled = disabled;
+  }
+}
+
+async function issueCertificate(type) {
+  if (!state.attemptId || state.certificateIssued) {
+    return;
+  }
+  setCertificateButtonsDisabled(true);
+  if (certificateStatusEl) {
+    certificateStatusEl.textContent = "Generating preview and sending email...";
+  }
+
+  try {
+    const response = await api(`/api/attempts/${state.attemptId}/certificate`, {
+      method: "POST",
+      body: JSON.stringify({ type })
+    });
+    state.certificateIssued = true;
+    if (response.previewHtml) {
+      const previewWindow = window.open("", "_blank");
+      if (previewWindow) {
+        previewWindow.document.open();
+        previewWindow.document.write(response.previewHtml);
+        previewWindow.document.close();
+      } else if (certificatePreviewEl) {
+        certificatePreviewEl.classList.remove("hidden");
+        certificatePreviewEl.innerHTML = `<iframe title="Certificate Preview" style="width:100%;min-height:360px;border:0;" srcdoc='${String(response.previewHtml).replace(/'/g, "&#39;")}'></iframe>`;
+      }
+    } else if (certificatePreviewEl) {
+      certificatePreviewEl.classList.remove("hidden");
+      certificatePreviewEl.innerHTML = `<iframe title="Certificate Preview" style="width:100%;min-height:360px;border:0;" srcdoc='${String(response.previewHtml).replace(/'/g, "&#39;")}'></iframe>`;
+    }
+    if (certificateStatusEl) {
+      certificateStatusEl.textContent =
+        response.emailStatus === "sent"
+          ? "Certificate emailed successfully."
+          : `Certificate generated, but email failed (${response.emailError || "unknown"}). Admin can track this in CSV.`;
+    }
+  } catch (error) {
+    if (certificateStatusEl) {
+      certificateStatusEl.textContent = error.message;
+    }
+    setCertificateButtonsDisabled(false);
+  }
 }
 
 function applyPowerupState(powerups) {
@@ -196,6 +289,16 @@ function showPowerupPopup(type) {
   }
   powerupPopupText.textContent = `${powerupLabel(type)} activated for this question!`;
   powerupPopup.classList.remove("hidden");
+  
+  if (window.confetti) {
+    window.confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#FCD34D', '#3B82F6', '#FF4D4D', '#10B981']
+    });
+  }
+
   setTimeout(() => powerupPopup.classList.add("hidden"), 2600);
 }
 
@@ -396,6 +499,13 @@ function blockClipboardActions(event) {
 ["copy", "cut", "paste", "contextmenu"].forEach((evt) => {
   document.addEventListener(evt, blockClipboardActions);
 });
+
+if (certificateParticipationBtn) {
+  certificateParticipationBtn.addEventListener("click", () => issueCertificate("participation"));
+}
+if (certificateScoreBtn) {
+  certificateScoreBtn.addEventListener("click", () => issueCertificate("score"));
+}
 
 window.addEventListener("pagehide", () => {
   if (!state.attemptId || state.submitted) {

@@ -5,7 +5,6 @@ const refreshAllBtn = document.getElementById("refresh-all");
 const exportCsvBtn = document.getElementById("export-csv");
 const leaderboardBody = document.getElementById("leaderboard-body");
 const submissionsBody = document.getElementById("submissions-body");
-const auditBody = document.getElementById("audit-body");
 const eventStatusBadge = document.getElementById("event-status-badge");
 const eventUpdated = document.getElementById("event-updated");
 const eventStartBtn = document.getElementById("event-start");
@@ -15,19 +14,25 @@ const lockOverlay = document.getElementById("lock-overlay");
 const lockTokenInput = document.getElementById("lock-token");
 const unlockAdminBtn = document.getElementById("unlock-admin");
 const lockMsg = document.getElementById("lock-msg");
+const authToast = document.getElementById("auth-toast");
+const certificateFilter = document.getElementById("certificate-filter");
+const resendFailedBtn = document.getElementById("resend-failed");
 
 const leaderboardCount = document.getElementById("leaderboard-count");
 const submissionsCount = document.getElementById("submissions-count");
-const auditCount = document.getElementById("audit-count");
 
 const navItems = document.querySelectorAll(".nav-item");
+let submissionsCache = [];
 
 function getToken() {
-  return localStorage.getItem("adminToken") || "";
+  return (localStorage.getItem("adminToken") || "").trim();
 }
 
 function setToken(token) {
-  localStorage.setItem("adminToken", token);
+  const sanitized = String(token || "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .trim();
+  localStorage.setItem("adminToken", sanitized);
 }
 
 function setLocked(locked) {
@@ -41,7 +46,10 @@ function setLocked(locked) {
 }
 
 async function adminApi(path, options = {}) {
-  const token = getToken();
+  const token = getToken().replace(/[^\x20-\x7E]/g, "").trim();
+  if (!token) {
+    throw new Error("Admin token is missing. Enter token again.");
+  }
   const response = await fetch(path, {
     ...options,
     headers: {
@@ -67,13 +75,6 @@ function renderRows(target, rows) {
   });
 }
 
-function jsonCell(obj) {
-  if (!obj) {
-    return "";
-  }
-  return `<code class="small">${JSON.stringify(obj)}</code>`;
-}
-
 function formatTimestamp(ts) {
   if (!ts) return "-";
   return new Date(ts).toLocaleString(undefined, {
@@ -91,26 +92,103 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;");
 }
 
+function showAuthToast(message) {
+  if (!authToast) {
+    return;
+  }
+  authToast.textContent = message;
+  authToast.classList.remove("hidden");
+  setTimeout(() => authToast.classList.add("hidden"), 1800);
+}
+
+function certificateStatusBadge(item) {
+  const status = item.certificate?.deliveryStatus;
+  if (!status) {
+    return "";
+  }
+  const cls =
+    status === "sent"
+      ? "cert-status-sent"
+      : status === "failed"
+        ? "cert-status-failed"
+        : "cert-status-pending";
+  return `<span class="status-badge ${cls}">${escapeHtml(status)}</span>`;
+}
+
+function certificateLastResult(item) {
+  const cert = item.certificate;
+  if (!cert?.certificateId) {
+    return "-";
+  }
+  if (cert.deliveryStatus === "sent") {
+    return `<span class="success-text">Sent</span> ${formatTimestamp(cert.deliverySentAt || cert.deliveryLastAttemptAt || cert.issuedAt)}`;
+  }
+  if (cert.deliveryStatus === "failed") {
+    const err = cert.deliveryError ? ` (${escapeHtml(cert.deliveryError)})` : "";
+    return `<span class="void-status">Failed</span> ${formatTimestamp(cert.deliveryLastAttemptAt || cert.issuedAt)}${err}`;
+  }
+  return `<span class="status-badge cert-status-pending">Pending</span> ${formatTimestamp(cert.deliveryLastAttemptAt || cert.issuedAt)}`;
+}
+
+function applySubmissionFilter(items) {
+  const filter = certificateFilter?.value || "all";
+  if (filter === "all") {
+    return items;
+  }
+  if (filter === "none") {
+    return items.filter((item) => !item.certificate?.certificateId);
+  }
+  return items.filter((item) => item.certificate?.deliveryStatus === filter);
+}
+
+function renderSubmissionsRows(items) {
+  const filtered = applySubmissionFilter(items);
+  submissionsCount.textContent = `${filtered.length} Items`;
+
+  renderRows(
+    submissionsBody,
+    filtered.map(
+      (item) => {
+        const certButtonLabel = item.certificate?.certificateId ? "Resend Certificate" : "Send Certificate";
+        const certStatus = certificateStatusBadge(item);
+        const disqualifyAction = item.isDisqualified
+          ? '<span class="void-status">Disqualified</span>'
+          : `<button type="button" class="brutal-btn brutal-btn-sm bg-primary text-white disqualify-btn" data-attempt-id="${item.id}">Disqualify</button>`;
+        return (
+        `<td><code class="small">${item.id.slice(0, 8)}...</code></td>
+         <td><strong>${item.name}</strong></td>
+         <td class="text-muted">${item.email}</td>
+         <td align="right">${item.score}</td>
+         <td>${item.voidReason ? `<span class="void-status">${item.voidReason}</span>` : '<span class="success-text">Success</span>'}</td>
+         <td>${(item.suspiciousReasons || []).map((x) => `<span class="status-badge">${escapeHtml(x)}</span>`).join(" ")} ${certStatus}</td>
+         <td>${certificateLastResult(item)}</td>
+         <td style="display:flex;gap:8px;align-items:center;">
+           ${disqualifyAction}
+           <button type="button" class="brutal-btn brutal-btn-sm bg-accent text-text send-certificate-btn" data-attempt-id="${item.id}">${certButtonLabel}</button>
+         </td>`
+        );
+      }
+    )
+  );
+}
+
 async function loadDashboard() {
   try {
+    const wasLocked = document.body.classList.contains("locked-admin");
     authMsg.textContent = "Updating Command Center...";
     authMsg.style.color = "var(--primary)";
 
-    const [leaderboardRes, submissionsRes, auditRes, eventStateRes] = await Promise.all([
+    const [leaderboardRes, submissionsRes, eventStateRes] = await Promise.all([
       adminApi("/api/admin/leaderboard?limit=100"),
       adminApi("/api/admin/submissions"),
-      adminApi("/api/admin/audit-logs?limit=200"),
       adminApi("/api/admin/event-state")
     ]);
 
     const leaderboard = await leaderboardRes.json();
     const submissions = await submissionsRes.json();
-    const audit = await auditRes.json();
     const eventState = await eventStateRes.json();
 
     leaderboardCount.textContent = `${leaderboard.items.length} Items`;
-    submissionsCount.textContent = `${submissions.items.length} Items`;
-    auditCount.textContent = `${audit.items.length} Items`;
     eventStatusBadge.textContent = String(eventState.status || "unknown").toUpperCase();
     eventUpdated.textContent = `Updated by ${eventState.updatedBy || "system"} at ${formatTimestamp(eventState.updatedAt)}`;
 
@@ -126,31 +204,8 @@ async function loadDashboard() {
       )
     );
 
-    renderRows(
-      submissionsBody,
-      submissions.items.map(
-        (item) =>
-          `<td><code class="small">${item.id.slice(0, 8)}...</code></td>
-           <td><strong>${item.name}</strong></td>
-           <td class="text-muted">${item.email}</td>
-           <td align="right">${item.score}</td>
-           <td>${item.voidReason ? `<span class="void-status">${item.voidReason}</span>` : '<span class="success-text">Success</span>'}</td>
-           <td>${(item.suspiciousReasons || []).map((x) => `<span class="status-badge">${escapeHtml(x)}</span>`).join(" ")}</td>
-           <td>${item.isDisqualified ? '<span class="void-status">Disqualified</span>' : `<button type="button" class="btn-secondary disqualify-btn" data-attempt-id="${item.id}">Disqualify</button>`}</td>`
-      )
-    );
-
-    renderRows(
-      auditBody,
-      audit.items.map(
-        (item) =>
-          `<td>${formatTimestamp(item.at)}</td>
-           <td><span class="status-badge">${item.type}</span></td>
-           <td><strong>${item.name || "-"}</strong></td>
-           <td class="text-muted">${item.email || "-"}</td>
-           <td>${jsonCell(item.metadata)}</td>`
-      )
-    );
+    submissionsCache = submissions.items || [];
+    renderSubmissionsRows(submissionsCache);
 
     authMsg.textContent = "Authorization Active";
     authMsg.style.color = "var(--success)";
@@ -158,6 +213,9 @@ async function loadDashboard() {
       lockMsg.textContent = "Unlocked";
     }
     setLocked(false);
+    if (wasLocked) {
+      showAuthToast("Authorization successful");
+    }
   } catch (error) {
     authMsg.textContent = error.message;
     authMsg.style.color = "var(--danger)";
@@ -168,16 +226,53 @@ async function loadDashboard() {
   }
 }
 
-saveTokenBtn.addEventListener("click", () => {
-  setToken(tokenInput.value.trim());
+saveTokenBtn?.addEventListener("click", () => {
+  if (!tokenInput) {
+    return;
+  }
+  setToken(tokenInput.value);
   if (lockTokenInput) {
-    lockTokenInput.value = tokenInput.value.trim();
+    lockTokenInput.value = getToken();
   }
   loadDashboard();
 });
 
 refreshAllBtn.addEventListener("click", () => {
   loadDashboard();
+});
+
+certificateFilter?.addEventListener("change", () => {
+  renderSubmissionsRows(submissionsCache);
+});
+
+resendFailedBtn?.addEventListener("click", async () => {
+  const failed = submissionsCache.filter((item) => item.certificate?.deliveryStatus === "failed");
+  if (failed.length === 0) {
+    authMsg.textContent = "No failed certificates to resend.";
+    authMsg.style.color = "var(--text-muted)";
+    return;
+  }
+  resendFailedBtn.disabled = true;
+  authMsg.textContent = `Resending ${failed.length} failed certificates...`;
+  authMsg.style.color = "var(--primary)";
+  let success = 0;
+  let failure = 0;
+  for (const item of failed) {
+    try {
+      await adminApi(`/api/admin/attempts/${item.id}/send-certificate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      success += 1;
+    } catch {
+      failure += 1;
+    }
+  }
+  resendFailedBtn.disabled = false;
+  await loadDashboard();
+  authMsg.textContent = `Resend complete. Success: ${success}, Failed: ${failure}`;
+  authMsg.style.color = failure > 0 ? "var(--danger)" : "var(--success)";
 });
 
 exportCsvBtn.addEventListener("click", async () => {
@@ -218,9 +313,11 @@ eventPauseBtn.addEventListener("click", () => updateEventState("paused"));
 eventStopBtn.addEventListener("click", () => updateEventState("stopped"));
 
 unlockAdminBtn?.addEventListener("click", () => {
-  const token = lockTokenInput?.value.trim() ?? "";
+  const token = lockTokenInput?.value ?? "";
   setToken(token);
-  tokenInput.value = token;
+  if (tokenInput) {
+    tokenInput.value = getToken();
+  }
   loadDashboard();
 });
 
@@ -230,23 +327,42 @@ submissionsBody.addEventListener("click", async (event) => {
     return;
   }
   const button = target.closest(".disqualify-btn");
-  if (!button) {
+  if (button) {
+    const attemptId = button.getAttribute("data-attempt-id");
+    if (!attemptId) {
+      return;
+    }
+    try {
+      await adminApi(`/api/admin/attempts/${attemptId}/disqualify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actor: "admin_panel" })
+      });
+      loadDashboard();
+    } catch (error) {
+      authMsg.textContent = error.message;
+      authMsg.style.color = "var(--danger)";
+    }
     return;
   }
-  const attemptId = button.getAttribute("data-attempt-id");
-  if (!attemptId) {
-    return;
-  }
-  try {
-    await adminApi(`/api/admin/attempts/${attemptId}/disqualify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ actor: "admin_panel" })
-    });
-    loadDashboard();
-  } catch (error) {
-    authMsg.textContent = error.message;
-    authMsg.style.color = "var(--danger)";
+
+  const sendCertButton = target.closest(".send-certificate-btn");
+  if (sendCertButton) {
+    const attemptId = sendCertButton.getAttribute("data-attempt-id");
+    if (!attemptId) {
+      return;
+    }
+    try {
+      await adminApi(`/api/admin/attempts/${attemptId}/send-certificate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "participation" })
+      });
+      await loadDashboard();
+    } catch (error) {
+      authMsg.textContent = error.message;
+      authMsg.style.color = "var(--danger)";
+    }
   }
 });
 
@@ -275,7 +391,9 @@ navItems.forEach(item => {
 document.querySelectorAll(".content-section").forEach(sec => sec.classList.add("hidden"));
 document.getElementById("auth").classList.remove("hidden");
 
-tokenInput.value = getToken();
+if (tokenInput) {
+  tokenInput.value = getToken();
+}
 if (lockTokenInput) {
   lockTokenInput.value = getToken();
 }

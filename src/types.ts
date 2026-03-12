@@ -36,6 +36,18 @@ export interface AttemptSummary {
 export type AttemptStatus = "in_progress" | "submitted" | "void";
 
 export type PowerupType = "eliminate_two" | "time_freeze" | "double_score" | "shield";
+export type CertificateType = "participation" | "score";
+export type CertificateDeliveryStatus = "pending" | "sent" | "failed";
+
+export interface AttemptCertificate {
+  certificateId: string;
+  type: CertificateType;
+  issuedAt: string;
+  deliveryStatus: CertificateDeliveryStatus;
+  deliveryError?: string;
+  deliveryLastAttemptAt?: string;
+  deliverySentAt?: string;
+}
 
 export interface AttemptPowerups {
   consecutiveCorrect: number;
@@ -73,6 +85,7 @@ export interface Attempt {
   disqualifiedAt?: number;
   disqualifiedBy?: string;
   powerups: AttemptPowerups;
+  certificate?: AttemptCertificate;
 }
 
 export type AuditEventType =

@@ -165,4 +165,46 @@ describe("API", () => {
     expect(queueStatus.body.inQueue).toBe(true);
     expect(queueStatus.body.position).toBe(1);
   });
+
+  it("issues one certificate choice, returns preview, and blocks second choice", async () => {
+    let now = 0;
+    const engine = new QuizEngine(
+      buildQuestionBank(),
+      new InMemoryAttemptStore(),
+      new InMemoryAuditStore(),
+      new InMemoryEventControlStore(),
+      {
+        now: () => now,
+        random: () => 0
+      }
+    );
+    const app = createApp(engine, { adminToken: "secret-token" });
+
+    const started = await request(app)
+      .post("/api/attempts/start")
+      .send({ name: "Cert", email: "cert@example.com" })
+      .expect(201);
+
+    for (let i = 0; i < 25; i += 1) {
+      now += 1_000;
+      await request(app)
+        .post(`/api/attempts/${started.body.attemptId}/answer`)
+        .send({ selectedAnswer: "A" })
+        .expect(200);
+    }
+
+    const issueRes = await request(app)
+      .post(`/api/attempts/${started.body.attemptId}/certificate`)
+      .send({ type: "participation" })
+      .expect(201);
+
+    expect(issueRes.body.certificate.type).toBe("participation");
+    expect(issueRes.body.previewHtml).toContain("Participation Certificate");
+    expect(["sent", "failed"]).toContain(issueRes.body.emailStatus);
+
+    await request(app)
+      .post(`/api/attempts/${started.body.attemptId}/certificate`)
+      .send({ type: "score" })
+      .expect(409);
+  });
 });

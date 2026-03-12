@@ -4,6 +4,8 @@ import cors from "cors";
 import { z } from "zod";
 import { QuizEngine, QuizRuleError } from "./quiz-engine.js";
 import type { Attempt } from "./types.js";
+import { renderCertificateHtml } from "./certificate.js";
+import { sendCertificateEmail } from "./certificate-mailer.js";
 
 interface AppOptions {
   adminToken: string;
@@ -173,6 +175,53 @@ export function createApp(engine: QuizEngine, options: AppOptions) {
     }
   });
 
+  app.post("/api/attempts/:attemptId/certificate", async (req, res, next) => {
+    try {
+      const payload = z
+        .object({
+          type: z.enum(["participation", "score"])
+        })
+        .parse(req.body ?? {});
+
+      const certificate = await engine.issueCertificate(req.params.attemptId, payload.type);
+      const attempt = await engine.getAttemptForTesting(req.params.attemptId);
+      if (!attempt) {
+        throw new QuizRuleError("Attempt not found", 404);
+      }
+
+      const previewHtml = renderCertificateHtml({
+        attempt,
+        type: certificate.type,
+        certificateId: certificate.certificateId,
+        issuedAt: certificate.issuedAt
+      });
+
+      const mailResult = await sendCertificateEmail({
+        to: attempt.email,
+        name: attempt.name,
+        certificateType: certificate.type,
+        score: attempt.score,
+        certificateId: certificate.certificateId,
+        certificateHtml: previewHtml
+      });
+
+      const updatedCertificate = await engine.setCertificateDelivery(
+        req.params.attemptId,
+        mailResult.status === "sent" ? "sent" : "failed",
+        mailResult.error
+      );
+
+      res.status(201).json({
+        certificate: updatedCertificate,
+        previewHtml,
+        emailStatus: mailResult.status,
+        emailError: mailResult.error
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/leaderboard", async (req, res, next) => {
     try {
       const limit = req.query.limit ? Number(req.query.limit) : 20;
@@ -231,19 +280,89 @@ export function createApp(engine: QuizEngine, options: AppOptions) {
     }
   });
 
+  app.post("/api/admin/attempts/:attemptId/send-certificate", requireAdminAuth, async (req, res, next) => {
+    try {
+      const payload = z
+        .object({
+          type: z.enum(["participation", "score"]).optional()
+        })
+        .parse(req.body ?? {});
+
+      const attemptId = String(req.params.attemptId);
+      let attempt = await engine.getAttemptForTesting(attemptId);
+      if (!attempt) {
+        throw new QuizRuleError("Attempt not found", 404);
+      }
+      if (attempt.status !== "submitted") {
+        throw new QuizRuleError("Certificate can be sent only for submitted attempts", 409);
+      }
+      if (attempt.isDisqualified) {
+        throw new QuizRuleError("Disqualified attempt cannot receive certificate", 403);
+      }
+
+      let certificate = attempt.certificate;
+      if (!certificate) {
+        certificate = await engine.issueCertificate(attemptId, payload.type ?? "participation");
+        attempt = await engine.getAttemptForTesting(attemptId);
+        if (!attempt) {
+          throw new QuizRuleError("Attempt not found", 404);
+        }
+      }
+
+      const previewHtml = renderCertificateHtml({
+        attempt,
+        type: certificate.type,
+        certificateId: certificate.certificateId,
+        issuedAt: certificate.issuedAt
+      });
+
+      const mailResult = await sendCertificateEmail({
+        to: attempt.email,
+        name: attempt.name,
+        certificateType: certificate.type,
+        score: attempt.score,
+        certificateId: certificate.certificateId,
+        certificateHtml: previewHtml
+      });
+
+      const updatedCertificate = await engine.setCertificateDelivery(
+        attemptId,
+        mailResult.status === "sent" ? "sent" : "failed",
+        mailResult.error
+      );
+
+      res.json({
+        ok: true,
+        certificate: updatedCertificate,
+        emailStatus: mailResult.status,
+        emailError: mailResult.error
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/admin/leaderboard", requireAdminAuth, async (req, res) => {
     const limit = req.query.limit ? Number(req.query.limit) : 100;
     res.json({ items: await engine.getLeaderboard(limit) });
   });
 
-  app.get("/api/admin/audit-logs", requireAdminAuth, async (req, res) => {
-    const limit = req.query.limit ? Number(req.query.limit) : 200;
-    res.json({ items: await engine.getAuditLogs(limit) });
-  });
-
   app.get("/api/admin/submissions.csv", requireAdminAuth, async (_req, res) => {
     const submissions = await engine.getSubmittedAttempts();
-    const header = ["attempt_id", "name", "email", "score", "submitted_at", "reason", "disqualified"].join(",");
+    const header = [
+      "attempt_id",
+      "name",
+      "email",
+      "score",
+      "submitted_at",
+      "reason",
+      "disqualified",
+      "certificate_type",
+      "certificate_id",
+      "certificate_status",
+      "certificate_error",
+      "certificate_sent_at"
+    ].join(",");
     const rows = submissions
       .map((item) =>
         [
@@ -253,7 +372,12 @@ export function createApp(engine: QuizEngine, options: AppOptions) {
           String(item.score),
           item.submittedAt ? new Date(item.submittedAt).toISOString() : "",
           toCsv(item.voidReason ?? ""),
-          String(Boolean(item.isDisqualified))
+          String(Boolean(item.isDisqualified)),
+          toCsv(item.certificate?.type ?? ""),
+          toCsv(item.certificate?.certificateId ?? ""),
+          toCsv(item.certificate?.deliveryStatus ?? ""),
+          toCsv(item.certificate?.deliveryError ?? ""),
+          toCsv(item.certificate?.deliverySentAt ?? "")
         ].join(",")
       )
       .join("\n");

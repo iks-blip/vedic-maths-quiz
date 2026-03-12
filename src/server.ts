@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { createApp } from "./app.js";
 import { FirestoreQuestionRepository, MarkdownQuestionRepository } from "./question-repository.js";
 import { QuizEngine } from "./quiz-engine.js";

@@ -114,6 +114,19 @@
           <span id="result-score" class="score-value">0</span>
         </div>
         <p id="result-text" class="info result-info"></p>
+        <div id="certificate-section" class="certificate-section hidden">
+          <p class="certificate-title">Choose your certificate</p>
+          <div class="certificate-actions">
+            <button id="certificate-participation-btn" class="brutal-btn bg-secondary text-white" type="button">
+              Participation Certificate
+            </button>
+            <button id="certificate-score-btn" class="brutal-btn bg-primary text-white" type="button">
+              Certificate With Score
+            </button>
+          </div>
+          <p id="certificate-status" class="info result-info"></p>
+          <div id="certificate-preview" class="certificate-preview hidden"></div>
+        </div>
         <button onclick="window.location.reload()" class="brutal-btn bg-accent">
           PLAY AGAIN
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
@@ -142,6 +155,7 @@
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script type="module" src="/app.js"></script>
   </body>
 </html>
