@@ -16,24 +16,49 @@ async function bootstrap() {
   const useFirebase = process.env.USE_FIREBASE === "1";
   const maxConcurrentAttempts = Number(process.env.MAX_CONCURRENT_ATTEMPTS ?? 17);
 
+  console.log("Bootstrap: starting server initialization");
+  console.log(
+    JSON.stringify({
+      port,
+      host,
+      useFirebase,
+      maxConcurrentAttempts,
+      hasAdminToken: Boolean(process.env.ADMIN_TOKEN),
+      hasFirebaseProjectId: Boolean(process.env.FIREBASE_PROJECT_ID),
+      hasFirebaseClientEmail: Boolean(process.env.FIREBASE_CLIENT_EMAIL),
+      hasFirebasePrivateKey: Boolean(process.env.FIREBASE_PRIVATE_KEY),
+      eventStartAtIst: process.env.EVENT_START_AT_IST ?? null,
+      eventEndAtIst: process.env.EVENT_END_AT_IST ?? null
+    })
+  );
+
   const questionRepository = useFirebase ? new FirestoreQuestionRepository() : new MarkdownQuestionRepository();
   const attemptStore = useFirebase ? new FirestoreAttemptStore() : new InMemoryAttemptStore();
   const auditStore = useFirebase ? new FirestoreAuditStore() : new InMemoryAuditStore();
   const eventControlStore = useFirebase ? new FirestoreEventControlStore() : new InMemoryEventControlStore();
 
+  console.log("Bootstrap: loading question bank");
   const questionBank = await questionRepository.loadQuestions();
+  console.log(`Bootstrap: loaded ${questionBank.length} questions`);
+
+  console.log("Bootstrap: resolving event window");
   const eventWindow = getEventWindowMs();
+
+  console.log("Bootstrap: creating quiz engine");
   const engine = new QuizEngine(questionBank, attemptStore, auditStore, eventControlStore, {
     eventStartAtMs: eventWindow.startAtMs,
     eventEndAtMs: eventWindow.endAtMs,
     maxConcurrentAttempts
   });
+
+  console.log("Bootstrap: creating express app");
   const app = createApp(engine, {
     adminToken: process.env.ADMIN_TOKEN ?? "admin-dev-token"
   });
 
   const lanUrl = process.env.LAN_URL;
 
+  console.log("Bootstrap: starting HTTP listener");
   app.listen(port, host, () => {
     console.log(`Vedic Maths quiz server running on http://localhost:${port}`);
     if (lanUrl) {
