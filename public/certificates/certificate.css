@@ -242,7 +242,16 @@ body {
 .signature-img {
   height: 60px;
   object-fit: contain;
-  margin-bottom: -10px;
+  margin-bottom: 4px;
+}
+
+.sig-shailee {
+  height: 70px;
+  margin-bottom: -4px;
+}
+
+.sig-shinde {
+  height: 60px;
 }
 
 .signature-line {
